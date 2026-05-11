@@ -1,0 +1,21 @@
+npm verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+npm info using npm@11.6.2
+npm info using node@v24.13.0
+npm verbose title npm exec tailwindcss init -p
+npm verbose argv "exec" "--" "tailwindcss" "init" "-p"
+npm verbose logfile logs-max:10 dir:C:\Users\Romany\AppData\Local\npm-cache\_logs\2026-03-13T20_18_29_432Z-
+npm verbose logfile C:\Users\Romany\AppData\Local\npm-cache\_logs\2026-03-13T20_18_29_432Z-debug-0.log
+npm verbose stack Error: could not determine executable to run
+npm verbose stack     at getBinFromManifest (C:\Program Files\nodejs\node_modules\npm\node_modules\libnpmexec\lib\get-bin-from-manifest.js:17:23)
+npm verbose stack     at exec (C:\Program Files\nodejs\node_modules\npm\node_modules\libnpmexec\lib\index.js:206:15)
+npm verbose stack     at async Npm.exec (C:\Program Files\nodejs\node_modules\npm\lib\npm.js:208:9)
+npm verbose stack     at async module.exports (C:\Program Files\nodejs\node_modules\npm\lib\cli\entry.js:67:5)
+npm verbose pkgid tailwindcss@4.2.1
+npm error could not determine executable to run
+npm verbose cwd C:\Users\Romany\Desktop\New folder (3)\StoreApp
+npm verbose os Windows_NT 10.0.26100
+npm verbose node v24.13.0
+npm verbose npm  v11.6.2
+npm verbose exit 1
+npm verbose code 1
+npm error A complete log of this run can be found in: C:\Users\Romany\AppData\Local\npm-cache\_logs\2026-03-13T20_18_29_432Z-debug-0.log

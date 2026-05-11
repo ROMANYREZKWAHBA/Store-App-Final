@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Recovery / Activation - StorePilot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #ff4757;
+            margin-top: 0;
+        }
+        p {
+            color: #a4b0be;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        .hwid-box {
+            background-color: #2f3542;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #7bed9f;
+            word-break: break-all;
+            user-select: text;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #dfe4ea;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            background-color: #2f3542;
+            border: 1px solid #57606f;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #1e90ff;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #1e90ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3742fa;
+        }
+        .error {
+            color: #ff4757;
+            font-size: 13px;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 id="title">Account Recovery / Activation</h1>
+    <p id="desc">Your software requires activation or recovery. Please provide your Hardware ID to the administrator or enter a valid activation/recovery key to continue.</p>
+    
+    <div class="input-group">
+        <label>Your Hardware ID (Give this to the administrator):</label>
+        <div class="hwid-box" id="hwidDisplay">Loading...</div>
+    </div>
+
+    <div class="input-group">
+        <label>Activation / Recovery Key:</label>
+        <input type="text" id="licenseKey" placeholder="Enter key...">
+    </div>
+
+    <button id="activateBtn">Activate Full Version</button>
+        <div class="error" id="errorMsg">Invalid key. Please try again.</div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const hwid = await window.electronAPI.getMachineId();
+            document.getElementById('hwidDisplay').innerText = hwid;
+        } catch (e) {
+            document.getElementById('hwidDisplay').innerText = "Error loading HWID";
+        }
+
+        const activateBtn = document.getElementById('activateBtn');
+        const inputField = document.getElementById('licenseKey');
+        const errorMsg = document.getElementById('errorMsg');
+
+        activateBtn.addEventListener('click', async () => {
+            const key = inputField.value;
+            if (!key) return;
+            
+            activateBtn.innerText = "Verifying...";
+            activateBtn.disabled = true;
+
+            const res = await window.electronAPI.activateLicense(key);
+            if (res && res.success) {
+                // If it succeeds, the main process will reload the window.
+                activateBtn.innerText = "Activated!";
+            } else {
+                errorMsg.style.display = 'block';
+                activateBtn.innerText = "Activate Full Version";
+                activateBtn.disabled = false;
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

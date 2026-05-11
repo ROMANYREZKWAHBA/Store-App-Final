@@ -1,0 +1,26 @@
+npm verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+npm info using npm@11.6.2
+npm info using node@v24.13.0
+npm verbose title npm run build
+npm verbose argv "run" "build"
+npm verbose logfile logs-max:10 dir:C:\Users\Romany\AppData\Local\npm-cache\_logs\2026-03-13T20_04_29_088Z-
+npm verbose logfile C:\Users\Romany\AppData\Local\npm-cache\_logs\2026-03-13T20_04_29_088Z-debug-0.log
+
+> storeapp@0.0.0 build
+> vite build
+
+[36mvite v8.0.0 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 16 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:  0.29 kB
+dist/assets/index-nqMpL4T3.css    1.78 kB │ gzip:  0.81 kB
+dist/assets/index-BFa2IUGX.js   343.05 kB │ gzip: 92.98 kB
+
+[32m✓ built in 528ms[39m
+npm verbose cwd C:\Users\Romany\Desktop\New folder (3)\StoreApp
+npm verbose os Windows_NT 10.0.26100
+npm verbose node v24.13.0
+npm verbose npm  v11.6.2
+npm verbose exit 0
+npm info ok

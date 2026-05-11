@@ -1,0 +1,68 @@
+{
+  "name": "storeapp",
+  "private": true,
+  "version": "1.0.0",
+  "homepage": "./",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron-build": "node secure-build.js"
+  },
+  "build": {
+    "appId": "com.storepilot.app",
+    "productName": "StorePilot",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "trial-utils.js",
+      "trial-expired.html",
+      "node_modules/node-machine-id/**/*",
+      "!*.tmp",
+      "!*.dev.js",
+      "!secure-build.js"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-machine-id/**"
+    ]
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "node-machine-id": "^1.1.12",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.0",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.1.2",
+    "electron": "^35.2.1",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "javascript-obfuscator": "^5.4.1",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.19",
+    "vite": "^8.0.0",
+    "wait-on": "^8.0.3"
+  }
+}

@@ -1,0 +1,23 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.storepilot.app
+productName: StorePilot
+files:
+  - filter:
+      - dist/**/*
+      - main.js
+      - preload.js
+      - trial-utils.js
+      - trial-expired.html
+      - node_modules/node-machine-id/**/*
+      - '!*.tmp'
+      - '!*.dev.js'
+      - '!secure-build.js'
+win:
+  target: nsis
+  icon: null
+asar: true
+asarUnpack:
+  - node_modules/node-machine-id/**
+electronVersion: 35.7.5

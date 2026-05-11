@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Inter:wght@400;600;800;900&display=swap');
+
+/* استخدام @import بدل @tailwind لحل مشكلة الـ Build في Vercel */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --bg-deep: #000000;
+  --bg-card: #111111;
+  --bg-sidebar: #050505;
+  --bg-header: #0a0a0a;
+  --border-color: #222222;
+  --accent-purple: #8120FF;
+  --accent-gold: #D4AF37;
+  --text-primary: #FFFFFF;
+  --text-secondary: #AAAAAA;
+  --text-muted: #555555;
+  
+  --font-ar: 'Cairo', sans-serif;
+  --font-en: 'Inter', sans-serif;
+}
+
+[data-theme="light"] {
+  --bg-deep: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #0F172A; 
+  --bg-header: #FFFFFF;
+  --border-color: #E2E8F0;
+  --accent-purple: #8120FF;
+  --accent-gold: #B48A00; 
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-en);
+}
+
+body[dir="rtl"] {
+  font-family: var(--font-ar);
+}
+
+/* Base styles for the sharp edges */
+* {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bloomberg-like highlight */
+.bloomberg-border {
+  border-left: 4px solid var(--accent-purple);
+}
+
+.gold-text {
+  color: var(--accent-gold);
+}
+
+.purple-bg {
+  background-color: var(--accent-purple);
+}
