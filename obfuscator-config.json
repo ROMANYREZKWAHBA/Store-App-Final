@@ -9,5 +9,7 @@
   "stringArrayThreshold": 0.75,
   "stringArrayEncoding": ["base64"],
   "renameGlobals": true,
-  "unicodeEscapeSequence": false
+  "unicodeEscapeSequence": false,
+  "reservedStrings": ["^VITE_.*", "import\\.meta\\.env"],
+  "reservedNames": ["import", "meta", "env"]
 }
