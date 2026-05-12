@@ -7,9 +7,18 @@
   "stringArrayRotate": true,
   "stringArrayShuffle": true,
   "stringArrayThreshold": 0.75,
-  "stringArrayEncoding": ["base64"],
+  "stringArrayEncoding": [
+    "base64"
+  ],
   "renameGlobals": true,
   "unicodeEscapeSequence": false,
-  "reservedStrings": ["^VITE_.*", "import\\.meta\\.env"],
-  "reservedNames": ["import", "meta", "env"]
+  "reservedStrings": [
+    "^VITE_.*",
+    "import\\.meta\\.env"
+  ],
+  "reservedNames": [
+    "import",
+    "meta",
+    "env"
+  ]
 }
