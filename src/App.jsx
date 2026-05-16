@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useOnlineStatus } from './useOnlineStatus';
 import * as SB from './supabaseService';
+import BranchManagement from './BranchManagement';
+import { fetchActiveBranches } from './branchService';
+import StockTransfersScreen from './StockTransfers';
 
 // Inject Google Fonts
 const styleEl = document.createElement('link');
@@ -243,7 +246,7 @@ const T = {
   en: {
     dashboard: "Live Dashboard", pos: "POS", shifts: "Shifts", sales: "Sales", inventory: "Inventory",
     purchases: "Purchases", expenses: "Expenses", treasury: "Treasury", staff: "Staff",
-    reports: "Reports", customers: "Customers", logs: "Audit Logs", settings: "Settings",
+    reports: "Reports", customers: "Customers", logs: "Audit Logs", settings: "Settings", branches: "Branches", transfers: "Transfers",
     statements: "Statements", logout: "Logout", search: "Search...",
     currentOrder: "Current Order", dineIn: "Dine-in", delivery: "Delivery",
     subtotal: "Subtotal", vat: "VAT", total: "Total", cash: "Cash", card: "Card",
@@ -254,7 +257,7 @@ const T = {
   ar: {
     dashboard: "لوحة البيانات", pos: "نقطة البيع", shifts: "الورديات", sales: "المبيعات", inventory: "المخزون",
     purchases: "المشتريات", expenses: "المصروفات", treasury: "الخزينة", staff: "الموظفين",
-    reports: "التقارير", customers: "العملاء", logs: "سجل العمليات", settings: "الإعدادات",
+    reports: "التقارير", customers: "العملاء", logs: "سجل العمليات", settings: "الإعدادات", branches: "الفروع", transfers: "التحويلات",
     statements: "الكشوفات", logout: "تسجيل الخروج", search: "بحث...",
     currentOrder: "الطلب الحالي", dineIn: "داخل المحل", delivery: "توصيل",
     subtotal: "المجموع الجزئي", vat: "ضريبة القيمة المضافة", total: "الإجمالي", cash: "نقدي", card: "بطاقة",
@@ -266,11 +269,11 @@ const T = {
 
 const ROLE_PERMISSIONS = {
   Owner: ['all'],
-  Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs'],
-  Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports'],
+  Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
+  Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
   Cashier: ['pos', 'shifts', 'sales'],
   Accountant: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'],
-  Storekeeper: ['inventory', 'purchases', 'reports'],
+  Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
 };
 
 const canAccess = (user, tab, customPerms) => {
@@ -3008,6 +3011,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
       items: [
         { id: 'inventory', label: t.inventory, icon: '📦' },
         { id: 'purchases', label: t.purchases, icon: '🛍️' },
+        { id: 'transfers', label: t.transfers, icon: '🚚' },
       ]
     },
     {
@@ -3016,6 +3020,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'treasury', label: t.treasury, icon: '🏦' },
         { id: 'staff', label: t.staff, icon: '👥' },
         { id: 'reports', label: t.reports, icon: '📈' },
+        { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
       ]
     },
@@ -3192,6 +3197,11 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
   const [fFrequency, setFFrequency] = useState('MONTHLY');
   const [fUsername, setFUsername] = useState('');
   const [fPassword, setFPassword] = useState('');
+  const [fBranchId, setFBranchId] = useState('');
+
+  // Branch list for assignment dropdown
+  const [branchList, setBranchList] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
 
   // Payment form
   const [payType, setPayType] = useState('SALARY');
@@ -3207,16 +3217,26 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     return matchSearch && matchRole && !e.deletedAt;
   });
 
+  // Load branches when modal opens
+  const loadBranches = async () => {
+    setBranchesLoading(true);
+    const { data } = await fetchActiveBranches();
+    setBranchList(data);
+    setBranchesLoading(false);
+  };
+
   const openAdd = () => {
     setEditingEmp(null);
-    setFName(''); setFRole('Cashier'); setFSalary(''); setFFrequency('MONTHLY'); setFUsername(''); setFPassword('');
+    setFName(''); setFRole('Cashier'); setFSalary(''); setFFrequency('MONTHLY'); setFUsername(''); setFPassword(''); setFBranchId('');
+    loadBranches();
     setShowForm(true);
   };
 
   const openEdit = (emp) => {
     setEditingEmp(emp);
     setFName(emp.name); setFRole(emp.role); setFSalary(emp.salaryBase.toString()); setFFrequency(emp.paymentFrequency || 'MONTHLY');
-    setFUsername(emp.username || ''); setFPassword('');
+    setFUsername(emp.username || ''); setFPassword(''); setFBranchId(emp.assignedBranchId || '');
+    loadBranches();
     setShowForm(true);
   };
 
@@ -3224,24 +3244,29 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     if (!fName.trim() || !fSalary) return;
     if (!fUsername.trim()) { alert(isRtl ? 'أدخل اسم المستخدم' : 'Enter username'); return; }
     if (!editingEmp && !fPassword) { alert(isRtl ? 'أدخل كلمة السر' : 'Enter password'); return; }
+    // Require branch for non-Owner roles
+    if (fRole !== 'Owner' && !fBranchId) { alert(isRtl ? 'اختر الفرع التابع له' : 'Please select an assigned branch'); return; }
 
     const unameTaken = users.some(u => u.username === fUsername && u.id !== editingEmp?.userId);
     if (unameTaken) { alert(isRtl ? 'اسم المستخدم محجوز' : 'Username already taken'); return; }
 
+    const branchIdVal = fRole === 'Owner' ? null : (fBranchId || null);
+    const branchNameVal = branchList.find(b => b.id === branchIdVal)?.name || null;
+
     if (editingEmp) {
-      const updated = { ...editingEmp, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, ...(fPassword ? { pin: fPassword } : {}) };
+      const updated = { ...editingEmp, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { pin: fPassword } : {}) };
       setEmployees(prev => prev.map(e => e.id === editingEmp.id ? updated : e));
       // sync user
       if (editingEmp.userId) {
         const u = users.find(x => x.id === editingEmp.userId);
-        if (u) setUsers(prev => prev.map(x => x.id === u.id ? { ...x, name: fName.trim(), username: fUsername, role: fRole, ...(fPassword ? { password: fPassword, pin: fPassword } : {}) } : x));
+        if (u) setUsers(prev => prev.map(x => x.id === u.id ? { ...x, name: fName.trim(), username: fUsername, role: fRole, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { password: fPassword, pin: fPassword } : {}) } : x));
       }
       pushNotification(isRtl ? 'تم تحديث الموظف' : 'Employee updated', 'success');
     } else {
       const empId = 'EMP-' + Date.now().toString(36).toUpperCase();
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
-      const newUser = { id: userId, name: fName.trim(), username: fUsername, password: fPassword, pin: fPassword, role: fRole, isActive: true };
-      const newEmp = { id: empId, userId, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, pin: fPassword, status: 'ACTIVE', shiftStatus: 'OFF_SHIFT', todaySales: 0, performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } };
+      const newUser = { id: userId, name: fName.trim(), username: fUsername, password: fPassword, pin: fPassword, role: fRole, isActive: true, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal };
+      const newEmp = { id: empId, userId, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, pin: fPassword, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, status: 'ACTIVE', shiftStatus: 'OFF_SHIFT', todaySales: 0, performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } };
       setUsers(prev => [...prev, newUser]);
       setEmployees(prev => [...prev, newEmp]);
       pushNotification(isRtl ? 'تم إضافة الموظف' : 'Employee added', 'success');
@@ -3522,6 +3547,37 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                   className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] rounded-none px-4 py-3 text-sm font-bold outline-none">
                   {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
+              </div>
+
+              {/* Branch Assignment Dropdown */}
+              <div>
+                <label className="text-[10px] font-black uppercase block mb-1.5" style={{ color: '#D4AF37', letterSpacing: '2px' }}>
+                  {isRtl ? '🏢 الفرع التابع له' : '🏢 Assigned Branch'}
+                  {fRole !== 'Owner' && <span className="text-rose-400 mx-1">*</span>}
+                </label>
+                {fRole === 'Owner' ? (
+                  <div className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-xs font-bold text-[#D4AF37] flex items-center gap-2">
+                    <span>👑</span>
+                    {isRtl ? 'المالك — صلاحية على جميع الفروع' : 'Owner — Global Access to All Branches'}
+                  </div>
+                ) : branchesLoading ? (
+                  <div className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-xs font-bold text-[#666] flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 border-2 border-[#333] border-t-[#D4AF37] animate-spin" style={{ borderRadius: '50%' }} />
+                    {isRtl ? 'جاري تحميل الفروع...' : 'Loading branches...'}
+                  </div>
+                ) : (
+                  <select value={fBranchId} onChange={e => setFBranchId(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-sm font-bold outline-none transition-all text-[var(--text-primary)]"
+                    style={{ borderColor: fBranchId ? '#D4AF37' : '#333' }}>
+                    <option value="">{isRtl ? '— اختر الفرع —' : '— Select Branch —'}</option>
+                    {branchList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
+                {!branchesLoading && branchList.length === 0 && fRole !== 'Owner' && (
+                  <p className="text-[9px] text-amber-400 font-bold mt-1">
+                    {isRtl ? '⚠️ لا توجد فروع — أضف فرعاً من لوحة إدارة الفروع أولاً' : '⚠️ No branches found — provision one first'}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -4916,6 +4972,11 @@ export default function App() {
     let found = users.find(u => u.role === role && (role === 'Cashier' ? u.pin === id : (u.username === id && u.password === pwd)));
     if (found && found.isActive) {
       setCurrentUser(found);
+      // Bind session to user's assigned branch (Cashier/Admin restriction)
+      // Owner keeps the machine-based branchId (global); others switch to their assigned branch
+      if (found.assignedBranchId && found.role !== 'Owner') {
+        setBranchId(found.assignedBranchId);
+      }
       const firstTab = canAccess(found, 'dashboard') ? 'dashboard' : 'pos';
       setActiveTab(firstTab);
       return null;
@@ -4923,7 +4984,7 @@ export default function App() {
     return isRtl ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';
   };
 
-  const handleLogout = () => setCurrentUser(null);
+  const handleLogout = () => { setCurrentUser(null); };
 
   const handleCompleteOrder = (order) => {
     setOrders(prev => [...prev, order]);
@@ -5108,6 +5169,15 @@ export default function App() {
       case 'treasury': return <TreasuryScreen orders={orders} purchases={purchases} expenses={expenses} vouchers={vouchers} customerPayments={customerPayments} staffPayments={staffPayments} cashLog={cashLog} setCashLog={setCashLog} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} bankBalance={bankBalance} setBankBalance={setBankBalance} />;
       case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} />;
+      case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
+      case 'branches': return currentUser.role === 'Owner'
+        ? <BranchManagement language={language} />
+        : <div className="flex flex-col items-center justify-center h-full gap-6 p-10">
+            <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center"><span className="text-4xl">🔒</span></div>
+            <h2 className="text-xl font-black text-white uppercase tracking-wider">{isRtl ? 'غير مصرح' : 'Unauthorized'}</h2>
+            <p className="text-[#666] text-xs font-bold uppercase tracking-widest text-center max-w-md">{isRtl ? 'هذه الصفحة متاحة فقط لحساب المالك. تواصل مع مدير النظام.' : 'This page is restricted to the System Owner. Contact your administrator.'}</p>
+            <button onClick={() => handleSetActiveTab('dashboard')} className="px-6 py-3 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition-all">{isRtl ? 'العودة للرئيسية' : 'Back to Dashboard'}</button>
+          </div>;
       default: return <PlaceholderScreen title={activeTab} icon="🔧" language={language} />;
     }
   };

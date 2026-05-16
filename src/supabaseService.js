@@ -85,10 +85,17 @@ export async function saveSettings(branchId, settings) {
 // USERS
 // ============================================================
 export async function fetchUsers(branchId) {
-  const data = await fetchAll('users', branchId);
-  return data.map(u => ({
+  // Left-join branches to get assigned branch name
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, assigned_branch:branches!assigned_branch_id(id, name)')
+    .eq('branch_id', branchId);
+  if (error) { console.error('Fetch users:', error); return []; }
+  return (data || []).map(u => ({
     id: u.id, name: u.name, username: u.username, password: u.password,
     pin: u.pin, role: u.role, isActive: u.is_active, recoveryCode: u.recovery_code,
+    assignedBranchId: u.assigned_branch_id || null,
+    assignedBranchName: u.assigned_branch?.name || null,
   }));
 }
 
@@ -97,6 +104,7 @@ export async function saveUser(branchId, user) {
     id: user.id, branch_id: branchId, name: user.name, username: user.username,
     password: user.password, pin: user.pin, role: user.role,
     is_active: user.isActive, recovery_code: user.recoveryCode,
+    assigned_branch_id: user.assignedBranchId || null,
   });
 }
 
