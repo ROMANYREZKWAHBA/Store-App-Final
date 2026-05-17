@@ -1782,7 +1782,7 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({
     name_en: '', name_ar: '', basePrice: '', costPrice: '',
-    categoryId: 'cat_1', stock: '', image: '', type: 'PRODUCT',
+    categoryId: 'cat_1', stock: '', barcode: '', image: '', type: 'PRODUCT',
     itemModifiers: []
   });
   const [showCatForm, setShowCatForm] = useState(false);
@@ -1822,13 +1822,14 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
       modifiers: form.itemModifiers,
       isActive: true,
       type: form.type,
+      barcode: form.barcode || '',
       sku: editItem?.sku || (Math.floor(1000 + Math.random() * 9000)).toString()
     };
     if (editItem) onUpdateItem(item);
     else onAddItem(item);
     setShowForm(false);
     setEditItem(null);
-    setForm({ name_en: '', name_ar: '', basePrice: '', costPrice: '', categoryId: 'cat_1', stock: '', image: '', type: 'PRODUCT', itemModifiers: [] });
+    setForm({ name_en: '', name_ar: '', basePrice: '', costPrice: '', categoryId: 'cat_1', stock: '', barcode: '', image: '', type: 'PRODUCT', itemModifiers: [] });
   };
 
   const toggleModifier = (modId) => {
@@ -1846,7 +1847,7 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
         <h2 className="text-xl font-black text-[var(--text-primary)] uppercase">{isRtl ? 'إدارة المخزون' : 'Inventory Management'}</h2>
         <button onClick={() => {
           setEditItem(null);
-          setForm({ name_en: '', name_ar: '', basePrice: '', costPrice: '', categoryId: 'cat_1', stock: '', image: '', type: 'PRODUCT', itemModifiers: [] });
+          setForm({ name_en: '', name_ar: '', basePrice: '', costPrice: '', categoryId: 'cat_1', stock: '', barcode: '', image: '', type: 'PRODUCT', itemModifiers: [] });
           setShowForm(true);
         }}
           className="bg-[#0066FF] text-white px-6 py-3 rounded-none font-black text-xs uppercase tracking-widest">
@@ -1918,6 +1919,15 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
                   <input type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })}
                     className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] p-3 text-sm font-bold outline-none" />
                 </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-[#D4AF37] uppercase block mb-1 tracking-widest flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#D4AF37] rounded-full animate-pulse shadow-[0_0_5px_#D4AF37]"></span>
+                  {isRtl ? 'الباركود / SKU' : 'Barcode / SKU'}
+                </label>
+                <input type="text" value={form.barcode || ''} onChange={e => setForm({ ...form, barcode: e.target.value })}
+                  placeholder={isRtl ? 'امسح الباركود هنا...' : 'Scan barcode here...'}
+                  className="w-full bg-[#111] border border-[#333] p-3 text-sm font-bold outline-none text-[#D4AF37] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all" />
               </div>
             </div>
 
@@ -2030,7 +2040,7 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
                       setForm({
                         name_en: item.name.en, name_ar: item.name.ar,
                         basePrice: item.basePrice, costPrice: item.costPrice || '',
-                        categoryId: item.categoryId, stock: item.stock,
+                        categoryId: item.categoryId, stock: item.stock, barcode: item.barcode || '',
                         image: item.image, type: item.type || 'PRODUCT',
                         itemModifiers: item.modifiers || []
                       });
@@ -5304,8 +5314,9 @@ export default function App() {
         if (authErr.message === 'BRANCH_DEACTIVATED') {
           return isRtl ? 'الفرع التابع له معطّل حالياً' : 'Your assigned branch is currently deactivated';
         }
-        console.warn('Cloud auth failed, falling back to local:', authErr);
+        console.error('⚠️ Cloud auth rejected or failed:', authErr);
       }
+      console.log('☁️ Cloud Auth Response for PIN:', id, '->', cloudUser);
 
       // Step 2: If cloud returned a match, use it
       if (cloudUser) {
@@ -5330,7 +5341,13 @@ export default function App() {
       }
 
       // Step 3: Fallback to local user array (offline mode)
-      let found = users.find(u => u.role === role && (role === 'Cashier' ? u.pin === id : (u.username === id && u.password === pwd)));
+      let found = users.find(u => u.role === role && (role === 'Cashier' ? String(u.pin) === String(id) : (u.username === id && u.password === pwd)));
+      
+      // Step 3.5: Hard Fallback to structural DEFAULT_USERS if Incognito/Schema error blocked user load
+      if (!found) {
+        found = DEFAULT_USERS.find(u => u.role === role && (role === 'Cashier' ? String(u.pin) === String(id) : (u.username === id && u.password === pwd)));
+      }
+      
       if (found && found.isActive) {
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
@@ -5348,6 +5365,11 @@ export default function App() {
         const firstTab = canAccess(found, 'dashboard') ? 'dashboard' : 'pos';
         setActiveTab(firstTab);
         return null;
+      }
+
+      if (!found && users.length === 0) {
+         console.warn('Login rejected: Cloud Auth returned null and local Users array is empty (Incognito/Offline). Checked DEFAULT_USERS but no match.');
+         return isRtl ? 'الاتصال بالسحابة مقطوع والبيانات المحلية فارغة' : 'Cloud connection failed and local cache is empty';
       }
 
       return isRtl ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';

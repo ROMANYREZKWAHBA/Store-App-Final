@@ -128,7 +128,15 @@ export async function verifyPinLogin(pin) {
     .limit(1)
     .maybeSingle();
 
-  if (error) { console.error('verifyPinLogin:', error); return null; }
+  console.log('🔍 SB.verifyPinLogin -> Request PIN:', pin, '| Error:', error, '| Data:', data);
+
+  if (error) { 
+    if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+      throw new Error('TABLE_MISSING');
+    }
+    console.error('verifyPinLogin:', error); 
+    return null; 
+  }
   if (!data) return null;
 
   // Step 2: If user has an assigned branch, fetch its details separately
@@ -172,7 +180,13 @@ export async function verifyCredentialsLogin(username, password, role) {
     .limit(1)
     .maybeSingle();
 
-  if (error) { console.error('verifyCredentialsLogin:', error); return null; }
+  if (error) { 
+    if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+      throw new Error('TABLE_MISSING');
+    }
+    console.error('verifyCredentialsLogin:', error); 
+    return null; 
+  }
   if (!data) return null;
 
   // Step 2: If user has an assigned branch, fetch its details separately
