@@ -2784,15 +2784,20 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const isRtl = language === 'ar';
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handlePin = () => {
-    const err = onLogin(pin, undefined, 'Cashier');
+  const handlePin = async () => {
+    setIsLoggingIn(true);
+    const err = await onLogin(pin, undefined, 'Cashier');
     if (err) setError(err);
+    setIsLoggingIn(false);
   };
 
-  const handleCredentials = () => {
-    const err = onLogin(username, password, selectedRole);
+  const handleCredentials = async () => {
+    setIsLoggingIn(true);
+    const err = await onLogin(username, password, selectedRole);
     if (err) setError(err);
+    setIsLoggingIn(false);
   };
 
   const handleRecovery = async () => {
@@ -2887,9 +2892,9 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
                 </button>
               ))}
             </div>
-            <button onClick={handlePin} disabled={pin.length < 4}
+            <button onClick={handlePin} disabled={pin.length < 4 || isLoggingIn}
               className="w-full py-5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-sm transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20">
-              {isRtl ? 'فتح المحطة' : 'Open Terminal'}
+              {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
             </button>
           </div>
         ) : (
@@ -2904,9 +2909,9 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF]" />
             </div>
-            <button onClick={handleCredentials}
-              className="w-full py-5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-sm transition-all mt-4 shadow-lg shadow-[#0066FF]/20">
-              {isRtl ? 'دخول للنظام' : 'Access System'}
+            <button onClick={handleCredentials} disabled={isLoggingIn}
+              className="w-full py-5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-sm transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20">
+              {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
             </button>
           </div>
         )}
@@ -2984,7 +2989,7 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
 // ============================================================
 // SIDEBAR
 // ============================================================
-function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName }) {
   const t = T[language];
   const isRtl = language === 'ar';
 
@@ -3086,6 +3091,12 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
               <p style={{ color: '#D4AF37', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px' }}>{user?.role}</p>
             </div>
           </div>
+          {activeBranchName && (
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', padding: '6px 10px', border: '1px solid #222' }}>
+              <span style={{ fontSize: 12 }}>🏢</span>
+              <span style={{ color: '#0066FF', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeBranchName}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -4693,7 +4704,8 @@ export default function App() {
   const isRtl = language === 'ar';
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState('dark');
-  const [branchId, setBranchId] = useState(null);
+  const [branchId, setBranchId] = useState(() => localStorage.getItem('active_branch_id') || null);
+  const [activeBranchName, setActiveBranchName] = useState(() => localStorage.getItem('active_branch_name') || '');
   const [cloudReady, setCloudReady] = useState(false);
 
 
@@ -4968,23 +4980,124 @@ export default function App() {
     return { ...item, stock };
   }), [items, orders]);
 
-  const handleLogin = (id, pwd, role) => {
-    let found = users.find(u => u.role === role && (role === 'Cashier' ? u.pin === id : (u.username === id && u.password === pwd)));
-    if (found && found.isActive) {
-      setCurrentUser(found);
-      // Bind session to user's assigned branch (Cashier/Admin restriction)
-      // Owner keeps the machine-based branchId (global); others switch to their assigned branch
-      if (found.assignedBranchId && found.role !== 'Owner') {
-        setBranchId(found.assignedBranchId);
+  // =========================================================================
+  // MULTI-BRANCH LOGIN: Supabase cross-branch auth with data reload
+  // =========================================================================
+  const reloadBranchData = useCallback(async (targetBranchId) => {
+    if (!targetBranchId) return;
+    try {
+      const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
+             cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
+             cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
+        SB.fetchUsers(targetBranchId),
+        SB.fetchCategories(targetBranchId),
+        SB.fetchItems(targetBranchId),
+        SB.fetchOrders(targetBranchId),
+        SB.fetchCustomers(targetBranchId),
+        SB.fetchExpenses(targetBranchId),
+        SB.fetchShifts(targetBranchId),
+        SB.fetchDrawerLogs(targetBranchId),
+        SB.fetchCustomerPayments(targetBranchId),
+        SB.fetchStaffPayments(targetBranchId),
+        SB.fetchUserPermissions(targetBranchId),
+        SB.fetchSettings(targetBranchId),
+      ]);
+      if (cloudUsers.length > 0) setUsers(cloudUsers);
+      if (cloudCategories.length > 0) setCategories(cloudCategories);
+      if (cloudItems.length > 0) setItems(cloudItems);
+      if (cloudOrders.length > 0) setOrders(cloudOrders); else setOrders([]);
+      if (cloudCustomers.length > 0) setCustomers(cloudCustomers); else setCustomers([]);
+      if (cloudExpenses.length > 0) setExpenses(cloudExpenses); else setExpenses([]);
+      if (cloudShifts.length > 0) setShifts(cloudShifts); else setShifts([]);
+      if (cloudDrawerLogs.length > 0) setDrawerLogs(cloudDrawerLogs); else setDrawerLogs([]);
+      if (cloudCustomerPayments.length > 0) setCustomerPayments(cloudCustomerPayments); else setCustomerPayments([]);
+      if (Object.keys(cloudStaffPayments).length > 0) setStaffPayments(cloudStaffPayments);
+      if (Object.keys(cloudUserPerms).length > 0) setUserPermissions(cloudUserPerms);
+      const openShift = cloudShifts.find(s => s.status === 'Open');
+      setActiveShift(openShift || null);
+      if (cloudSettings) {
+        if (cloudSettings.drawer_balance != null) setDrawerBalance(Number(cloudSettings.drawer_balance));
+        if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
+        if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
       }
-      const firstTab = canAccess(found, 'dashboard') ? 'dashboard' : 'pos';
-      setActiveTab(firstTab);
-      return null;
+      console.log('🔄 Branch data reloaded for:', targetBranchId);
+    } catch (err) {
+      console.error('Branch data reload failed:', err);
     }
-    return isRtl ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';
+  }, []);
+
+  const handleLogin = async (id, pwd, role) => {
+    try {
+      // Step 1: Try Supabase cross-branch auth (cloud-first)
+      let cloudUser = null;
+      try {
+        if (role === 'Cashier') {
+          cloudUser = await SB.verifyPinLogin(id);
+        } else {
+          cloudUser = await SB.verifyCredentialsLogin(id, pwd, role);
+        }
+      } catch (authErr) {
+        if (authErr.message === 'BRANCH_DEACTIVATED') {
+          return isRtl ? 'الفرع التابع له معطّل حالياً' : 'Your assigned branch is currently deactivated';
+        }
+        console.warn('Cloud auth failed, falling back to local:', authErr);
+      }
+
+      // Step 2: If cloud returned a match, use it
+      if (cloudUser) {
+        setCurrentUser(cloudUser);
+        // Bind session to user's assigned branch
+        if (cloudUser.assignedBranchId && cloudUser.role !== 'Owner') {
+          setBranchId(cloudUser.assignedBranchId);
+          setActiveBranchName(cloudUser.assignedBranchName || '');
+          localStorage.setItem('active_branch_id', cloudUser.assignedBranchId);
+          localStorage.setItem('active_branch_name', cloudUser.assignedBranchName || '');
+          // Reload data scoped to the user's assigned branch
+          await reloadBranchData(cloudUser.assignedBranchId);
+        } else if (cloudUser.role === 'Owner' && branchId) {
+          // Owner keeps existing machine branch
+          setActiveBranchName('Main Branch');
+          localStorage.setItem('active_branch_id', branchId);
+          localStorage.setItem('active_branch_name', 'Main Branch');
+        }
+        const firstTab = canAccess(cloudUser, 'dashboard') ? 'dashboard' : 'pos';
+        setActiveTab(firstTab);
+        return null;
+      }
+
+      // Step 3: Fallback to local user array (offline mode)
+      let found = users.find(u => u.role === role && (role === 'Cashier' ? u.pin === id : (u.username === id && u.password === pwd)));
+      if (found && found.isActive) {
+        setCurrentUser(found);
+        if (found.assignedBranchId && found.role !== 'Owner') {
+          setBranchId(found.assignedBranchId);
+          setActiveBranchName(found.assignedBranchName || '');
+          localStorage.setItem('active_branch_id', found.assignedBranchId);
+          localStorage.setItem('active_branch_name', found.assignedBranchName || '');
+          await reloadBranchData(found.assignedBranchId);
+        } else if (found.role === 'Owner' && branchId) {
+          setActiveBranchName('Main Branch');
+          localStorage.setItem('active_branch_id', branchId);
+          localStorage.setItem('active_branch_name', 'Main Branch');
+        }
+        const firstTab = canAccess(found, 'dashboard') ? 'dashboard' : 'pos';
+        setActiveTab(firstTab);
+        return null;
+      }
+
+      return isRtl ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials';
+    } catch (err) {
+      console.error('Login error:', err);
+      return isRtl ? 'حدث خطأ أثناء تسجيل الدخول' : 'Login error occurred';
+    }
   };
 
-  const handleLogout = () => { setCurrentUser(null); };
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveBranchName('');
+    localStorage.removeItem('active_branch_id');
+    localStorage.removeItem('active_branch_name');
+  };
 
   const handleCompleteOrder = (order) => {
     setOrders(prev => [...prev, order]);
@@ -5208,6 +5321,7 @@ export default function App() {
           userPermissions={userPermissions}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
+          activeBranchName={activeBranchName}
         />
       )}
 
@@ -5225,6 +5339,12 @@ export default function App() {
                 </h1>
               </div>
               <div className="flex items-center gap-4">
+                {activeBranchName && (
+                  <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
+                    <span style={{ fontSize: 12 }}>🏢</span>
+                    <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
+                  </div>
+                )}
                 {activeShift && (
                   <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
                     <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />

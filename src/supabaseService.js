@@ -109,6 +109,73 @@ export async function saveUser(branchId, user) {
 }
 
 // ============================================================
+// MULTI-BRANCH AUTH: PIN & Credential Verification (cross-branch)
+// ============================================================
+
+/**
+ * Verify a cashier's PIN across ALL branches (not limited to a single branch_id).
+ * Returns the matched user with relational branch data, or null.
+ * Throws an error string if the assigned branch is deactivated.
+ */
+export async function verifyPinLogin(pin) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, assigned_branch:branches!assigned_branch_id(id, name, is_active)')
+    .eq('pin', pin)
+    .eq('role', 'Cashier')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) { console.error('verifyPinLogin:', error); return null; }
+  if (!data) return null;
+
+  // Branch deactivation guard
+  if (data.assigned_branch && data.assigned_branch.is_active === false) {
+    throw new Error('BRANCH_DEACTIVATED');
+  }
+
+  return {
+    id: data.id, name: data.name, username: data.username, password: data.password,
+    pin: data.pin, role: data.role, isActive: data.is_active, recoveryCode: data.recovery_code,
+    assignedBranchId: data.assigned_branch_id || null,
+    assignedBranchName: data.assigned_branch?.name || null,
+  };
+}
+
+/**
+ * Verify username/password login for Admin/Owner/Manager roles across ALL branches.
+ * Returns the matched user with relational branch data, or null.
+ * Throws an error string if the assigned branch is deactivated.
+ */
+export async function verifyCredentialsLogin(username, password, role) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, assigned_branch:branches!assigned_branch_id(id, name, is_active)')
+    .eq('username', username)
+    .eq('password', password)
+    .eq('role', role)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) { console.error('verifyCredentialsLogin:', error); return null; }
+  if (!data) return null;
+
+  // Branch deactivation guard (Owners have null assigned_branch — always pass)
+  if (data.assigned_branch && data.assigned_branch.is_active === false) {
+    throw new Error('BRANCH_DEACTIVATED');
+  }
+
+  return {
+    id: data.id, name: data.name, username: data.username, password: data.password,
+    pin: data.pin, role: data.role, isActive: data.is_active, recoveryCode: data.recovery_code,
+    assignedBranchId: data.assigned_branch_id || null,
+    assignedBranchName: data.assigned_branch?.name || null,
+  };
+}
+
+// ============================================================
 // CATEGORIES
 // ============================================================
 export async function fetchCategories(branchId) {
