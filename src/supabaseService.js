@@ -118,9 +118,10 @@ export async function saveUser(branchId, user) {
  * Throws an error string if the assigned branch is deactivated.
  */
 export async function verifyPinLogin(pin) {
+  // Step 1: Find the user by PIN globally (no branch_id filter)
   const { data, error } = await supabase
     .from('users')
-    .select('*, assigned_branch:branches!assigned_branch_id(id, name, is_active)')
+    .select('*')
     .eq('pin', pin)
     .eq('role', 'Cashier')
     .eq('is_active', true)
@@ -130,8 +131,19 @@ export async function verifyPinLogin(pin) {
   if (error) { console.error('verifyPinLogin:', error); return null; }
   if (!data) return null;
 
+  // Step 2: If user has an assigned branch, fetch its details separately
+  let branchInfo = null;
+  if (data.assigned_branch_id) {
+    const { data: branchData } = await supabase
+      .from('branches')
+      .select('id, name, is_active')
+      .eq('id', data.assigned_branch_id)
+      .maybeSingle();
+    branchInfo = branchData || null;
+  }
+
   // Branch deactivation guard
-  if (data.assigned_branch && data.assigned_branch.is_active === false) {
+  if (branchInfo && branchInfo.is_active === false) {
     throw new Error('BRANCH_DEACTIVATED');
   }
 
@@ -139,7 +151,7 @@ export async function verifyPinLogin(pin) {
     id: data.id, name: data.name, username: data.username, password: data.password,
     pin: data.pin, role: data.role, isActive: data.is_active, recoveryCode: data.recovery_code,
     assignedBranchId: data.assigned_branch_id || null,
-    assignedBranchName: data.assigned_branch?.name || null,
+    assignedBranchName: branchInfo?.name || null,
   };
 }
 
@@ -149,9 +161,10 @@ export async function verifyPinLogin(pin) {
  * Throws an error string if the assigned branch is deactivated.
  */
 export async function verifyCredentialsLogin(username, password, role) {
+  // Step 1: Find the user by credentials globally (no branch_id filter)
   const { data, error } = await supabase
     .from('users')
-    .select('*, assigned_branch:branches!assigned_branch_id(id, name, is_active)')
+    .select('*')
     .eq('username', username)
     .eq('password', password)
     .eq('role', role)
@@ -162,8 +175,19 @@ export async function verifyCredentialsLogin(username, password, role) {
   if (error) { console.error('verifyCredentialsLogin:', error); return null; }
   if (!data) return null;
 
+  // Step 2: If user has an assigned branch, fetch its details separately
+  let branchInfo = null;
+  if (data.assigned_branch_id) {
+    const { data: branchData } = await supabase
+      .from('branches')
+      .select('id, name, is_active')
+      .eq('id', data.assigned_branch_id)
+      .maybeSingle();
+    branchInfo = branchData || null;
+  }
+
   // Branch deactivation guard (Owners have null assigned_branch — always pass)
-  if (data.assigned_branch && data.assigned_branch.is_active === false) {
+  if (branchInfo && branchInfo.is_active === false) {
     throw new Error('BRANCH_DEACTIVATED');
   }
 
@@ -171,7 +195,7 @@ export async function verifyCredentialsLogin(username, password, role) {
     id: data.id, name: data.name, username: data.username, password: data.password,
     pin: data.pin, role: data.role, isActive: data.is_active, recoveryCode: data.recovery_code,
     assignedBranchId: data.assigned_branch_id || null,
-    assignedBranchName: data.assigned_branch?.name || null,
+    assignedBranchName: branchInfo?.name || null,
   };
 }
 

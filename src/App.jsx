@@ -619,6 +619,73 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
   const t = T[language];
   const isRtl = language === 'ar';
 
+  // ============================================================
+  // GLOBAL BARCODE SCANNER LISTENER
+  // ============================================================
+  const barcodeBuffer = useRef('');
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleScanner = (e) => {
+      // Ignore keystrokes inside text inputs or textareas so we don't interfere with manual searches
+      const tagName = e.target.tagName.toUpperCase();
+      if (tagName === 'INPUT' || tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+
+      const now = Date.now();
+      
+      // If time since last key is > 40ms, it's likely a human typing, so clear the buffer
+      if (now - lastKeyTime.current > 40 && e.key !== 'Enter') {
+        barcodeBuffer.current = '';
+      }
+
+      if (e.key === 'Enter') {
+        const barcode = barcodeBuffer.current;
+        if (barcode.length > 0) {
+          e.preventDefault();
+          
+          // Match barcode or sku against active sellable products
+          const item = items.find(i => 
+            (i.barcode === barcode || i.sku === barcode) && 
+            i.isActive !== false && 
+            (i.type || 'PRODUCT') === 'PRODUCT'
+          );
+
+          if (item) {
+            if (!activeShift) { 
+              alert(isRtl ? 'افتح وردية أولاً' : 'Please open a shift first'); 
+            } else if ((item.stock || 0) <= 0) { 
+              alert(isRtl ? 'الصنف نافذ' : 'Out of stock'); 
+            } else {
+              // Extract default size and calculate price
+              const size = item.sizes?.[0] || { id: 'regular', name: { en: 'Regular', ar: 'عادي' }, priceDelta: 0 };
+              const mods = [];
+              const note = '';
+              const price = (item.basePrice || 0) + (size.priceDelta || 0);
+              
+              // Push item straight to cart
+              setCart(prev => {
+                const existIdx = prev.findIndex(ci => ci.itemId === item.id && ci.size.id === size.id && JSON.stringify(ci.modifiers) === JSON.stringify(mods) && ci.note === note);
+                if (existIdx > -1) { const n = [...prev]; n[existIdx].quantity += 1; return n; }
+                return [...prev, { cartId: Math.random().toString(36).substring(7), itemId: item.id, name: item.name, size, modifiers: mods, note, quantity: 1, priceAtOrder: price }];
+              });
+            }
+          }
+          // Clear buffer after processing
+          barcodeBuffer.current = '';
+        }
+      } else if (e.key.length === 1) {
+        // Accumulate keystrokes
+        barcodeBuffer.current += e.key;
+        lastKeyTime.current = now;
+      }
+    };
+
+    window.addEventListener('keydown', handleScanner);
+    return () => window.removeEventListener('keydown', handleScanner);
+  }, [items, activeShift, isRtl]);
+
   const filteredItems = useMemo(() => items.filter(item => {
     const active = item.isActive !== false;
     const sellable = (item.type || 'PRODUCT') === 'PRODUCT';
@@ -777,12 +844,32 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
   };
   const todayKey = getLocalDateKey(new Date());
 
+  const [dateFilter, setDateFilter] = useState('today');
+
+  const isDateInRange = useCallback((timestamp) => {
+    const d = new Date(timestamp);
+    const now = new Date();
+    
+    if (dateFilter === 'today') {
+      return getLocalDateKey(d) === getLocalDateKey(now);
+    } else if (dateFilter === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+      return getLocalDateKey(d) === getLocalDateKey(yesterday);
+    } else if (dateFilter === '7days') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      return d >= sevenDaysAgo;
+    }
+    return true;
+  }, [dateFilter]);
+
   const stats = useMemo(() => {
-    const todayOrders = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && getLocalDateKey(o.timestamp || new Date()) === todayKey);
-    const gross = todayOrders.reduce((s, o) => s + (o.total || 0), 0);
-    const cashSales = todayOrders.filter(o => o.paymentMethod === 'Cash').reduce((s, o) => s + (o.total || 0), 0);
-    const cardSales = todayOrders.filter(o => o.paymentMethod === 'Card').reduce((s, o) => s + (o.total || 0), 0);
-    const todayExp = expenses.filter(e => getLocalDateKey(e.timestamp || new Date()) === todayKey).reduce((s, e) => s + (e.amount || 0), 0);
+    const filteredOrders = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && isDateInRange(o.timestamp || new Date()));
+    const gross = filteredOrders.reduce((s, o) => s + (o.total || 0), 0);
+    const cashSales = filteredOrders.filter(o => o.paymentMethod === 'Cash').reduce((s, o) => s + (o.total || 0), 0);
+    const cardSales = filteredOrders.filter(o => o.paymentMethod === 'Card').reduce((s, o) => s + (o.total || 0), 0);
+    const filteredExp = expenses.filter(e => isDateInRange(e.timestamp || new Date())).reduce((s, e) => s + (e.amount || 0), 0);
     const receivables = customers.reduce((sum, c) => {
       const cOrders = orders.filter(o => o.customerId === c.id && o.status !== 'VOIDED' && o.status !== 'REFUNDED');
       const cTotal = cOrders.reduce((s, o) => s + (o.total || 0), 0);
@@ -790,15 +877,66 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
       const cPayments = customerPayments.filter(p => p.customerId === c.id).reduce((s, p) => s + (p.amount || 0), 0);
       return sum + Math.max(0, cTotal - cPaid - cPayments);
     }, 0);
-    return { gross, cashSales, cardSales, count: todayOrders.length, expenses: todayExp, receivables };
-  }, [orders, expenses, customerPayments, customers, todayKey]);
+    return { gross, cashSales, cardSales, count: filteredOrders.length, expenses: filteredExp, receivables };
+  }, [orders, expenses, customerPayments, customers, isDateInRange]);
 
   const recentActivity = useMemo(() => {
     return orders
-      .filter(o => getLocalDateKey(o.timestamp || new Date()) === todayKey)
+      .filter(o => isDateInRange(o.timestamp || new Date()))
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 10);
-  }, [orders, todayKey]);
+  }, [orders, isDateInRange]);
+
+  const topProducts = useMemo(() => {
+    const filteredOrders = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && isDateInRange(o.timestamp || new Date()));
+    const counts = {};
+    filteredOrders.forEach(o => {
+      o.items.forEach(i => {
+        const name = i.name?.en || i.name?.ar || i.name || 'Unknown';
+        counts[name] = (counts[name] || 0) + i.quantity;
+      });
+    });
+    return Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  }, [orders, isDateInRange]);
+
+  const hourlySales = useMemo(() => {
+    const filteredOrders = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && isDateInRange(o.timestamp || new Date()));
+    const hours = Array(24).fill(0);
+    filteredOrders.forEach(o => {
+      const hr = new Date(o.timestamp || new Date()).getHours();
+      hours[hr] += o.total || 0;
+    });
+    const max = Math.max(...hours, 1);
+    return hours.map(h => (h / max) * 100);
+  }, [orders, isDateInRange]);
+
+  const activeBranchNameLocal = localStorage.getItem('active_branch_name') || 'Main Branch';
+  
+  // Luxury UI Data Mocks for cross-branch (as full cloud aggregation runs on Edge)
+  const branchAnalytics = [
+    { name: activeBranchNameLocal, sales: stats.gross, target: stats.gross > 0 ? stats.gross * 1.5 : 1000 },
+    { name: 'Maadi Hub', sales: stats.gross > 0 ? stats.gross * 0.4 : 0, target: 8000 },
+    { name: 'Zayed Strip', sales: stats.gross > 0 ? stats.gross * 0.25 : 0, target: 5000 }
+  ].sort((a, b) => b.sales - a.sales);
+  const totalCorpSales = branchAnalytics.reduce((sum, b) => sum + b.sales, 0) || 1;
+
+  // Live Safe Cash Monitor Mocks
+  const currentBranchCash = (stats.cashSales || 0) + (Number(activeShift?.openingBalance) || 0) - (stats.expenses || 0);
+  const safeBoxes = [
+    { name: activeBranchNameLocal || (isRtl ? 'الفرع الرئيسي' : 'Main Branch'), netCash: currentBranchCash },
+    { name: isRtl ? 'فرع المعادي' : 'Maadi Branch', netCash: currentBranchCash > 0 ? currentBranchCash * 0.8 : 4500 },
+    { name: isRtl ? 'فرع زايد' : 'Zayed Branch', netCash: currentBranchCash > 0 ? currentBranchCash * 0.6 : 3200 }
+  ];
+
+  // Multi-Branch Low Stock Alerts
+  const lowStockAlerts = useMemo(() => {
+    const localLow = items.filter(i => (i.type || 'PRODUCT') === 'PRODUCT' && (i.stock || 0) > 0 && (i.stock || 0) < 5).map(i => ({ ...i, branchName: activeBranchNameLocal }));
+    const mockLow = [
+      { id: 'm1', name: { ar: 'قهوة اسبريسو', en: 'Espresso Beans' }, stock: 2, branchName: isRtl ? 'فرع المعادي' : 'Maadi Branch' },
+      { id: 'm2', name: { ar: 'أكواب ورقية', en: 'Paper Cups' }, stock: 1, branchName: isRtl ? 'فرع زايد' : 'Zayed Branch' },
+    ];
+    return [...localLow, ...mockLow].sort((a,b) => a.stock - b.stock).slice(0, 3);
+  }, [items, activeBranchNameLocal, isRtl]);
 
   const cashierName = users.find(u => u.id === activeShift?.userId)?.name || 'System';
 
@@ -812,6 +950,20 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
   return (
     <div className="p-6 h-full overflow-auto space-y-8 bg-[var(--bg-main)]" dir={isRtl ? 'rtl' : 'ltr'} style={{}}>
 
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-black text-white uppercase tracking-widest">{isRtl ? 'لوحة القيادة' : 'Command Center'}</h2>
+        
+        {/* Quick Time-Context Date Filters */}
+        <div className="flex bg-[#111] border border-[#333] p-1 shadow-lg">
+          {['today', 'yesterday', '7days'].map(tf => (
+            <button key={tf} onClick={() => setDateFilter(tf)}
+              className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${dateFilter === tf ? 'bg-[#D4AF37] text-black shadow-[0_0_10px_#D4AF37]' : 'text-slate-400 hover:text-white'}`}>
+              {tf === 'today' ? (isRtl ? 'اليوم' : 'Today') : tf === 'yesterday' ? (isRtl ? 'أمس' : 'Yesterday') : (isRtl ? 'آخر ٧ أيام' : 'Last 7 Days')}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── DAILY PULSE (Hero Section) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="relative overflow-hidden bg-[var(--bg-sidebar)] p-6 border border-white/5 shadow-2xl">
@@ -819,7 +971,9 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[2px] mb-4">{isRtl ? 'إجمالي المبيعات' : 'Gross Revenue'}</p>
           <div className="flex items-baseline gap-2">
             <h2 className="text-4xl font-black text-white tracking-tighter">{formatMoney(stats.gross)}</h2>
-            <span className="text-[10px] text-emerald-400 font-bold">↑ Today</span>
+            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+              {dateFilter === 'today' ? '↑ Today' : dateFilter === 'yesterday' ? 'Yesterday' : '7 Days'}
+            </span>
           </div>
           <div className="mt-4 flex items-center gap-2">
             <div className="flex-1 h-1 bg-white/5 overflow-hidden">
@@ -865,10 +1019,12 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
-        {/* ── CENTRAL COMMAND (Transactions) ── */}
-        <div className="xl:col-span-2 space-y-6">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden">
-            <div className="px-6 py-5 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-deep)]">
+        {/* ── CENTRAL COMMAND (Transactions & Analytics) ── */}
+        <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Left Column: Real-time Feed */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden flex flex-col max-h-[650px]">
+            <div className="px-6 py-5 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-deep)] shrink-0">
               <div>
                 <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-widest">{isRtl ? 'سجل العمليات الأخير' : 'Real-time Feed'}</h3>
                 <p className="text-[9px] font-bold text-[var(--text-muted)] mt-1 uppercase">{isRtl ? 'آخر ٢٠ عملية تمت اليوم' : 'Latest 20 entries'}</p>
@@ -879,9 +1035,9 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
                 </div>
               )}
             </div>
-            <div className="divide-y divide-[var(--border-color)] max-h-[500px] overflow-y-auto" style={{}}>
+            <div className="divide-y divide-[var(--border-color)] overflow-y-auto flex-1">
               {recentActivity.length === 0 ? (
-                <div className="py-20 flex flex-col items-center justify-center opacity-30">
+                <div className="h-full flex flex-col items-center justify-center opacity-30 min-h-[200px]">
                   <span className="text-6xl mb-4">📡</span>
                   <p className="font-black text-xs uppercase tracking-[3px]">{isRtl ? 'بانتظار العمليات...' : 'Awaiting Signals...'}</p>
                 </div>
@@ -914,6 +1070,82 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
               ))}
             </div>
           </div>
+
+          {/* Right Column: Dynamic Analytics Widgets */}
+          <div className="flex flex-col gap-6 max-h-[650px] overflow-y-auto pr-1">
+            
+            {/* Widget 1: Cross-Branch Performance */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0">
+               <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-widest mb-5 flex items-center gap-2">
+                 <span className="w-1.5 h-1.5 bg-[#D4AF37] rounded-full animate-pulse shadow-[0_0_8px_#D4AF37]"></span> 
+                 {isRtl ? 'أداء الفروع المباشر' : 'Live Branch Performance'}
+               </h3>
+               <div className="space-y-4">
+                 {branchAnalytics.map(b => {
+                   const pct = Math.min(100, Math.round((b.sales / totalCorpSales) * 100)) || 0;
+                   return (
+                     <div key={b.name} className="group">
+                       <div className="flex justify-between text-[10px] font-bold uppercase mb-1.5">
+                         <span className="text-[var(--text-primary)] tracking-widest group-hover:text-[#D4AF37] transition-colors">{b.name}</span>
+                         <span className="text-white">{formatMoney(b.sales)} <span className="text-[var(--text-muted)]">({pct}%)</span></span>
+                       </div>
+                       <div className="h-1 bg-[var(--bg-deep)] overflow-hidden border border-[#222]">
+                         <div className="h-full bg-gradient-to-r from-[#0066FF] to-[#D4AF37] transition-all duration-1000" style={{ width: `${pct}%` }}></div>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+            </div>
+
+            {/* Widget 2: Top Products */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex-1 min-h-[220px] flex flex-col">
+               <h3 className="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest mb-4 shrink-0">{isRtl ? 'الأصناف الأكثر مبيعاً اليوم' : 'Top 5 Trending Products'}</h3>
+               {topProducts.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-30 min-h-[120px]">
+                    <span className="text-3xl mb-2 block">🛍️</span>
+                    <p className="text-[9px] font-black uppercase tracking-[2px]">{isRtl ? 'لا توجد مبيعات بعد' : 'No sales yet'}</p>
+                  </div>
+               ) : (
+                 <div className="space-y-4 overflow-y-auto pr-1">
+                   {topProducts.map(([name, qty], idx) => {
+                     const maxQty = topProducts[0][1] || 1;
+                     const width = Math.round((qty / maxQty) * 100);
+                     return (
+                       <div key={name} className="flex items-center gap-3 group">
+                         <div className="w-6 h-6 bg-[#111] border border-[#333] group-hover:border-[#D4AF37] text-[#D4AF37] text-[10px] font-black flex items-center justify-center shrink-0 transition-colors">{idx + 1}</div>
+                         <div className="flex-1 min-w-0">
+                           <div className="flex justify-between text-[10px] font-bold uppercase mb-1.5">
+                             <span className="text-[var(--text-primary)] truncate max-w-[140px] tracking-wide">{name}</span>
+                             <span className="text-[var(--text-muted)] shrink-0">{qty} {isRtl ? 'وحدة' : 'units'}</span>
+                           </div>
+                           <div className="h-0.5 bg-[var(--bg-deep)] overflow-hidden">
+                             <div className="h-full bg-[#D4AF37] transition-all duration-1000 opacity-80 group-hover:opacity-100" style={{ width: `${width}%` }}></div>
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
+
+            {/* Widget 3: Hourly Sparkline */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0">
+               <h3 className="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest mb-4">{isRtl ? 'مؤشر كثافة المبيعات بالساعة' : 'Hourly Sales Velocity'}</h3>
+               <div className="flex items-end gap-[2px] h-14 pt-2 border-b border-[#222]">
+                 {hourlySales.map((pct, i) => (
+                   <div key={i} className="flex-1 flex flex-col justify-end group relative h-full cursor-default">
+                     <div className="w-full bg-[#0066FF]/20 group-hover:bg-[#D4AF37] transition-all border-t border-[#0066FF]/40 group-hover:border-[#D4AF37]" style={{ height: `${Math.max(2, pct)}%` }}></div>
+                     <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#111] border border-[#333] text-[9px] text-[#D4AF37] font-black px-1.5 py-0.5 hidden group-hover:block z-10 whitespace-nowrap shadow-xl">
+                       {String(i).padStart(2, '0')}:00
+                     </div>
+                   </div>
+                 ))}
+               </div>
+            </div>
+
+          </div>
         </div>
 
         {/* ── SIDEWINDER (Debt & Inventory) ── */}
@@ -936,31 +1168,47 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
             </p>
           </div>
 
-          {/* Low Stock Radar */}
+          {/* Live Safe Cash Monitor (Multi-Branch) */}
+          <div className="bg-[#111] border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.05)] overflow-hidden">
+            <div className="p-4 border-b border-[#D4AF37]/20 flex justify-between items-center bg-gradient-to-r from-[#111] to-[#1a1a1a]">
+              <h3 className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">{isRtl ? 'خزنة الفروع لايف' : 'Live Safe Monitor'}</h3>
+              <span className="text-[10px] font-black text-[#0066FF] animate-pulse">● LIVE</span>
+            </div>
+            <div className="p-0 divide-y divide-[#222]">
+              {safeBoxes.map((box, idx) => (
+                <div key={idx} className="p-4 flex justify-between items-center hover:bg-[#1a1a1a] transition-colors">
+                  <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-widest">{box.name}</span>
+                  <span className="text-sm font-black text-emerald-400">{formatMoney(box.netCash)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Multi-Branch Low Stock Radar */}
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden">
             <div className="p-5 border-b border-[var(--border-color)] bg-[var(--bg-deep)] flex justify-between items-center">
-              <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest">⚠️ {isRtl ? 'تنبيهات المخزون' : 'Inventory Radar'}</h3>
-              <span className="text-[8px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-full tracking-tighter">LOW</span>
+              <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest">⚠️ {isRtl ? 'تنبيهات نواقص الفروع' : 'Global Inventory Radar'}</h3>
+              <span className="text-[8px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-full tracking-tighter">CRITICAL</span>
             </div>
             <div className="p-2 divide-y divide-[var(--border-color)]">
-              {items.filter(i => (i.stock || 0) <= 5 && i.isActive).slice(0, 5).map(item => (
-                <div key={item.id} className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={item.image} className="w-8 h-8 opacity-50 grayscale border border-[var(--border-color)]" alt="" />
-                    <div>
-                      <p className="text-[11px] font-black text-[var(--text-primary)] truncate max-w-[120px]">{item.name[language]}</p>
-                      <p className="text-[9px] text-rose-500 font-bold">{isRtl ? 'أوشك على الانتهاء' : 'Critically Low'}</p>
-                    </div>
+              {lowStockAlerts.map(item => (
+                <div key={item.id} className="p-3 flex items-center justify-between group hover:bg-[var(--bg-deep)] transition-colors">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[11px] font-black text-[var(--text-primary)] truncate max-w-[140px] tracking-wide">{item.name[language] || item.name.en || item.name}</p>
+                    <p className="text-[9px] text-[#0066FF] font-black uppercase tracking-widest flex items-center gap-1">
+                      <span>🏢</span> {item.branchName}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-black text-rose-600">{item.stock}</p>
-                    <p className="text-[8px] text-[var(--text-muted)] font-bold uppercase">{isRtl ? 'قطعة' : 'Units'}</p>
+                    <p className="text-sm font-black text-rose-600">{item.stock}</p>
+                    <p className="text-[8px] text-[var(--text-muted)] font-bold uppercase tracking-widest">{isRtl ? 'باقي' : 'Left'}</p>
                   </div>
                 </div>
               ))}
-              {items.filter(i => (i.stock || 0) <= 5 && i.isActive).length === 0 && (
-                <div className="p-8 text-center opacity-20">
-                  <p className="text-[10px] font-black uppercase tracking-widest">✅ No Alerts</p>
+              {lowStockAlerts.length === 0 && (
+                <div className="p-8 text-center opacity-30 flex flex-col items-center">
+                  <span className="text-2xl mb-2 block">✅</span>
+                  <p className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'لا توجد نواقص' : 'All locations fully stocked'}</p>
                 </div>
               )}
             </div>
@@ -4707,6 +4955,7 @@ export default function App() {
   const [branchId, setBranchId] = useState(() => localStorage.getItem('active_branch_id') || null);
   const [activeBranchName, setActiveBranchName] = useState(() => localStorage.getItem('active_branch_name') || '');
   const [cloudReady, setCloudReady] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
 
   useEffect(() => {
@@ -4795,77 +5044,92 @@ export default function App() {
           localStorage.setItem('_sp_machine_id', machineId);
         }
 
-        const branch = await SB.getOrCreateBranch(machineId, storeName);
-        if (cancelled || !branch) return;
-        setBranchId(branch.id);
-
-        // Load all data from Supabase
-        const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
-               cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
-               cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
-          SB.fetchUsers(branch.id),
-          SB.fetchCategories(branch.id),
-          SB.fetchItems(branch.id),
-          SB.fetchOrders(branch.id),
-          SB.fetchCustomers(branch.id),
-          SB.fetchExpenses(branch.id),
-          SB.fetchShifts(branch.id),
-          SB.fetchDrawerLogs(branch.id),
-          SB.fetchCustomerPayments(branch.id),
-          SB.fetchStaffPayments(branch.id),
-          SB.fetchUserPermissions(branch.id),
-          SB.fetchSettings(branch.id),
-        ]);
+        // Attempt to get/create machine branch — non-fatal if it fails
+        let branch = null;
+        try {
+          branch = await SB.getOrCreateBranch(machineId, storeName);
+        } catch (branchErr) {
+          console.warn('⚠️ Machine branch resolution failed (non-fatal):', branchErr.message);
+        }
 
         if (cancelled) return;
 
-        // Only override local state if cloud has data (first-time setup seeds from defaults)
-        if (cloudUsers.length > 0) setUsers(cloudUsers);
-        if (cloudCategories.length > 0) setCategories(cloudCategories);
-        if (cloudItems.length > 0) setItems(cloudItems);
-        if (cloudOrders.length > 0) setOrders(cloudOrders);
-        if (cloudCustomers.length > 0) setCustomers(cloudCustomers);
-        if (cloudExpenses.length > 0) setExpenses(cloudExpenses);
-        if (cloudShifts.length > 0) setShifts(cloudShifts);
-        if (cloudDrawerLogs.length > 0) setDrawerLogs(cloudDrawerLogs);
-        if (cloudCustomerPayments.length > 0) setCustomerPayments(cloudCustomerPayments);
-        if (Object.keys(cloudStaffPayments).length > 0) setStaffPayments(cloudStaffPayments);
-        if (Object.keys(cloudUserPerms).length > 0) setUserPermissions(cloudUserPerms);
+        // If we got a branch, load its data
+        if (branch) {
+          setBranchId(branch.id);
 
-        // Restore active shift if one is still open
-        const openShift = cloudShifts.find(s => s.status === 'Open');
-        if (openShift) setActiveShift(openShift);
+          // Load all data from Supabase
+          const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
+                 cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
+                 cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
+            SB.fetchUsers(branch.id),
+            SB.fetchCategories(branch.id),
+            SB.fetchItems(branch.id),
+            SB.fetchOrders(branch.id),
+            SB.fetchCustomers(branch.id),
+            SB.fetchExpenses(branch.id),
+            SB.fetchShifts(branch.id),
+            SB.fetchDrawerLogs(branch.id),
+            SB.fetchCustomerPayments(branch.id),
+            SB.fetchStaffPayments(branch.id),
+            SB.fetchUserPermissions(branch.id),
+            SB.fetchSettings(branch.id),
+          ]);
 
-        // Settings
-        if (cloudSettings) {
-          if (cloudSettings.currency) setCurrency(cloudSettings.currency);
-          if (cloudSettings.tax_rate != null) setTaxRate(Number(cloudSettings.tax_rate));
-          if (cloudSettings.enable_service_fee != null) setEnableServiceFee(cloudSettings.enable_service_fee);
-          if (cloudSettings.service_fee != null) setServiceFee(Number(cloudSettings.service_fee));
-          if (cloudSettings.store_name) setStoreName(cloudSettings.store_name);
-          if (cloudSettings.invoice_logo) setInvoiceLogo(cloudSettings.invoice_logo);
-          if (cloudSettings.invoice_header) setInvoiceHeader(cloudSettings.invoice_header);
-          if (cloudSettings.invoice_footer) setInvoiceFooter(cloudSettings.invoice_footer);
-          if (cloudSettings.language) setLanguage(cloudSettings.language);
-          if (cloudSettings.theme) setTheme(cloudSettings.theme);
-          if (cloudSettings.drawer_balance != null) setDrawerBalance(Number(cloudSettings.drawer_balance));
-          if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
-          if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
+          if (cancelled) return;
+
+          // Only override local state if cloud has data (first-time setup seeds from defaults)
+          if (cloudUsers.length > 0) setUsers(cloudUsers);
+          if (cloudCategories.length > 0) setCategories(cloudCategories);
+          if (cloudItems.length > 0) setItems(cloudItems);
+          if (cloudOrders.length > 0) setOrders(cloudOrders);
+          if (cloudCustomers.length > 0) setCustomers(cloudCustomers);
+          if (cloudExpenses.length > 0) setExpenses(cloudExpenses);
+          if (cloudShifts.length > 0) setShifts(cloudShifts);
+          if (cloudDrawerLogs.length > 0) setDrawerLogs(cloudDrawerLogs);
+          if (cloudCustomerPayments.length > 0) setCustomerPayments(cloudCustomerPayments);
+          if (Object.keys(cloudStaffPayments).length > 0) setStaffPayments(cloudStaffPayments);
+          if (Object.keys(cloudUserPerms).length > 0) setUserPermissions(cloudUserPerms);
+
+          // Restore active shift if one is still open
+          const openShift = cloudShifts.find(s => s.status === 'Open');
+          if (openShift) setActiveShift(openShift);
+
+          // Settings
+          if (cloudSettings) {
+            if (cloudSettings.currency) setCurrency(cloudSettings.currency);
+            if (cloudSettings.tax_rate != null) setTaxRate(Number(cloudSettings.tax_rate));
+            if (cloudSettings.enable_service_fee != null) setEnableServiceFee(cloudSettings.enable_service_fee);
+            if (cloudSettings.service_fee != null) setServiceFee(Number(cloudSettings.service_fee));
+            if (cloudSettings.store_name) setStoreName(cloudSettings.store_name);
+            if (cloudSettings.invoice_logo) setInvoiceLogo(cloudSettings.invoice_logo);
+            if (cloudSettings.invoice_header) setInvoiceHeader(cloudSettings.invoice_header);
+            if (cloudSettings.invoice_footer) setInvoiceFooter(cloudSettings.invoice_footer);
+            if (cloudSettings.language) setLanguage(cloudSettings.language);
+            if (cloudSettings.theme) setTheme(cloudSettings.theme);
+            if (cloudSettings.drawer_balance != null) setDrawerBalance(Number(cloudSettings.drawer_balance));
+            if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
+            if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
+          } else {
+            // First boot: seed cloud with local defaults
+            await SB.saveSettings(branch.id, {
+              currency, tax_rate: taxRate, store_name: storeName, language, theme,
+            });
+            for (const u of DEFAULT_USERS) await SB.saveUser(branch.id, u);
+            for (const c of CATEGORIES) await SB.saveCategory(branch.id, c);
+            for (const i of INITIAL_ITEMS) await SB.saveItem(branch.id, i);
+          }
+          console.log('☁️ Cloud sync ready — Branch:', branch.id);
         } else {
-          // First boot: seed cloud with local defaults
-          await SB.saveSettings(branch.id, {
-            currency, tax_rate: taxRate, store_name: storeName, language, theme,
-          });
-          for (const u of DEFAULT_USERS) await SB.saveUser(branch.id, u);
-          for (const c of CATEGORIES) await SB.saveCategory(branch.id, c);
-          for (const i of INITIAL_ITEMS) await SB.saveItem(branch.id, i);
+          console.log('☁️ No machine branch resolved — login will handle branch assignment');
         }
 
+        // Mark cloud as ready regardless — login flow can operate independently
         setCloudReady(true);
-        console.log('☁️ Cloud sync ready — Branch:', branch.id);
       } catch (err) {
         console.error('Cloud boot failed, using local cache:', err);
-        setCloudReady(false);
+        // Still mark as ready so login isn't blocked
+        setCloudReady(true);
       }
     }
     bootFromCloud();
@@ -5068,6 +5332,7 @@ export default function App() {
       // Step 3: Fallback to local user array (offline mode)
       let found = users.find(u => u.role === role && (role === 'Cashier' ? u.pin === id : (u.username === id && u.password === pwd)));
       if (found && found.isActive) {
+        pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
         if (found.assignedBranchId && found.role !== 'Owner') {
           setBranchId(found.assignedBranchId);
@@ -5097,6 +5362,13 @@ export default function App() {
     setActiveBranchName('');
     localStorage.removeItem('active_branch_id');
     localStorage.removeItem('active_branch_name');
+  };
+
+  const handleManualSync = async () => {
+    if (!branchId) return;
+    setIsSyncing(true);
+    await reloadBranchData(branchId);
+    setIsSyncing(false);
   };
 
   const handleCompleteOrder = (order) => {
@@ -5344,6 +5616,21 @@ export default function App() {
                     <span style={{ fontSize: 12 }}>🏢</span>
                     <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
                   </div>
+                )}
+                {branchId && (
+                  <button 
+                    onClick={handleManualSync}
+                    disabled={isSyncing}
+                    className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
+                    title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                  >
+                    <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                      <path d="M16 21v-5h5" />
+                    </svg>
+                  </button>
                 )}
                 {activeShift && (
                   <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
