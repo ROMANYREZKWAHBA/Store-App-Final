@@ -197,16 +197,18 @@ export default function StockTransfersScreen({ currentUser, branchId, items, lan
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: isRtl ? 'إجمالي التحويلات' : 'Total', value: transfers.length, color: '#0066FF', icon: '📊' },
-          { label: isRtl ? 'قيد الانتظار' : 'Pending', value: transfers.filter(t => t.status === 'pending').length, color: '#f59e0b', icon: '⏳' },
-          { label: isRtl ? 'واردة تنتظر موافقتك' : 'Awaiting Your Approval', value: pendingIncoming, color: '#10b981', icon: '📥' },
-          { label: isRtl ? 'معتمدة' : 'Approved', value: transfers.filter(t => t.status === 'approved').length, color: '#D4AF37', icon: '✅' },
+          { label: isRtl ? 'إجمالي التحويلات' : 'Total', value: transfers.length, color: 'text-blue-400', icon: '📊' },
+          { label: isRtl ? 'قيد الانتظار' : 'Pending', value: transfers.filter(t => t.status === 'pending').length, color: 'text-amber-400', icon: '⏳' },
+          { label: isRtl ? 'واردة تنتظر موافقتك' : 'Awaiting Your Approval', value: pendingIncoming, color: 'text-emerald-400', icon: '📥' },
+          { label: isRtl ? 'معتمدة' : 'Approved', value: transfers.filter(t => t.status === 'approved').length, color: 'text-[#D4AF37]', icon: '✅' },
         ].map((s, i) => (
-          <div key={i} className="bg-[#111] border border-[#222] p-5 flex items-center gap-4 hover:border-[#333] transition-colors">
-            <span className="text-2xl">{s.icon}</span>
+          <div key={i} className="bg-[#161616] border border-[#D4AF37]/20 p-5 flex items-center gap-4 hover:border-[#D4AF37]/40 transition-colors shadow-lg">
+            <div className={`w-12 h-12 rounded-none flex items-center justify-center text-2xl bg-black/30 border border-white/5 ${s.color}`}>
+              {s.icon}
+            </div>
             <div>
-              <p className="text-2xl font-black text-white">{loading ? '—' : s.value}</p>
-              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: s.color }}>{s.label}</p>
+              <p className="text-2xl font-black text-zinc-100 tracking-tight">{loading ? '—' : s.value}</p>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">{s.label}</p>
             </div>
           </div>
         ))}
