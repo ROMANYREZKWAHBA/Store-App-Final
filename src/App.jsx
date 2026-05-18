@@ -626,12 +626,49 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
   const lastKeyTime = useRef(0);
 
   useEffect(() => {
+    console.log('📡 Global Barcode Hook Active');
+
+    const handleBarcodeMatch = (barcode) => {
+      if (!barcode) return;
+      console.log('🎯 Barcode Match Attempted For:', barcode);
+
+      // Match barcode or sku against active sellable products
+      const item = items.find(i => 
+        (i.barcode === barcode || i.sku === barcode) && 
+        i.isActive !== false && 
+        (i.type || 'PRODUCT') === 'PRODUCT'
+      );
+
+      if (item) {
+        if (!activeShift) { 
+          alert(isRtl ? 'افتح وردية أولاً' : 'Please open a shift first'); 
+        } else if ((item.stock || 0) <= 0) { 
+          alert(isRtl ? 'الصنف نافذ' : 'Out of stock'); 
+        } else {
+          // Extract default size and calculate price
+          const size = item.sizes?.[0] || { id: 'regular', name: { en: 'Regular', ar: 'عادي' }, priceDelta: 0 };
+          const mods = [];
+          const note = '';
+          const price = (item.basePrice || 0) + (size.priceDelta || 0);
+          
+          // Push item straight to cart
+          setCart(prev => {
+            const existIdx = prev.findIndex(ci => ci.itemId === item.id && ci.size.id === size.id && JSON.stringify(ci.modifiers) === JSON.stringify(mods) && ci.note === note);
+            if (existIdx > -1) { const n = [...prev]; n[existIdx].quantity += 1; return n; }
+            return [...prev, { cartId: Math.random().toString(36).substring(7), itemId: item.id, name: item.name, size, modifiers: mods, note, quantity: 1, priceAtOrder: price }];
+          });
+        }
+      }
+    };
+
     const handleScanner = (e) => {
       // Ignore keystrokes inside text inputs or textareas so we don't interfere with manual searches
       const tagName = e.target.tagName.toUpperCase();
       if (tagName === 'INPUT' || tagName === 'TEXTAREA' || e.target.isContentEditable) {
         return;
       }
+
+      console.log('[Barcode Key]:', e.key);
 
       const now = Date.now();
       
@@ -642,39 +679,9 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
 
       if (e.key === 'Enter') {
         const barcode = barcodeBuffer.current;
-        if (barcode.length > 0) {
-          e.preventDefault();
-          
-          // Match barcode or sku against active sellable products
-          const item = items.find(i => 
-            (i.barcode === barcode || i.sku === barcode) && 
-            i.isActive !== false && 
-            (i.type || 'PRODUCT') === 'PRODUCT'
-          );
-
-          if (item) {
-            if (!activeShift) { 
-              alert(isRtl ? 'افتح وردية أولاً' : 'Please open a shift first'); 
-            } else if ((item.stock || 0) <= 0) { 
-              alert(isRtl ? 'الصنف نافذ' : 'Out of stock'); 
-            } else {
-              // Extract default size and calculate price
-              const size = item.sizes?.[0] || { id: 'regular', name: { en: 'Regular', ar: 'عادي' }, priceDelta: 0 };
-              const mods = [];
-              const note = '';
-              const price = (item.basePrice || 0) + (size.priceDelta || 0);
-              
-              // Push item straight to cart
-              setCart(prev => {
-                const existIdx = prev.findIndex(ci => ci.itemId === item.id && ci.size.id === size.id && JSON.stringify(ci.modifiers) === JSON.stringify(mods) && ci.note === note);
-                if (existIdx > -1) { const n = [...prev]; n[existIdx].quantity += 1; return n; }
-                return [...prev, { cartId: Math.random().toString(36).substring(7), itemId: item.id, name: item.name, size, modifiers: mods, note, quantity: 1, priceAtOrder: price }];
-              });
-            }
-          }
-          // Clear buffer after processing
-          barcodeBuffer.current = '';
-        }
+        handleBarcodeMatch(barcode);
+        // Clear buffer after processing
+        barcodeBuffer.current = '';
       } else if (e.key.length === 1) {
         // Accumulate keystrokes
         barcodeBuffer.current += e.key;
@@ -682,8 +689,29 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
       }
     };
 
+    const handlePaste = (e) => {
+      const tagName = e.target.tagName.toUpperCase();
+      if (tagName === 'INPUT' || tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+
+      const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      if (pastedText) {
+        const cleanText = pastedText.trim();
+        // Check if it's a numeric or SKU string (alphanumeric with hyphens/underscores)
+        if (/^[a-zA-Z0-9-_]+$/.test(cleanText)) {
+          handleBarcodeMatch(cleanText);
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleScanner);
-    return () => window.removeEventListener('keydown', handleScanner);
+    window.addEventListener('paste', handlePaste);
+    
+    return () => {
+      window.removeEventListener('keydown', handleScanner);
+      window.removeEventListener('paste', handlePaste);
+    };
   }, [items, activeShift, isRtl]);
 
   const filteredItems = useMemo(() => items.filter(item => {
