@@ -4998,6 +4998,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   // Auth
@@ -5087,7 +5088,7 @@ export default function App() {
         try {
           branch = await SB.getOrCreateBranch(machineId, storeName);
         } catch (branchErr) {
-          console.warn('⚠️ Machine branch resolution failed (non-fatal):', branchErr.message);
+          console.error('⚠️ Initial Supabase Query Error (getOrCreateBranch):', branchErr);
         }
 
         if (cancelled) return;
@@ -5622,7 +5623,7 @@ export default function App() {
 
 
   return (
-    <div className="flex h-screen w-screen bg-[var(--bg-deep)]" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="flex h-screen w-screen bg-slate-50 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Offline Warning Banner */}
       {!isOnline && (
