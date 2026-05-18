@@ -162,7 +162,7 @@ export default function BranchManagement({ language }) {
   const activeCount = branches.filter(b => b.is_active).length;
 
   return (
-    <div className="p-6 md:p-10 space-y-8 min-h-full" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="p-6 md:p-10 space-y-8 min-h-full bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
