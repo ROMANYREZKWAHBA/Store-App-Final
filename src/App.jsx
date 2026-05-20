@@ -968,18 +968,18 @@ function Dashboard({ items, orders, customers, expenses, purchases, customerPaym
 
   const cashierName = users.find(u => u.id === activeShift?.userId)?.name || 'System';
 
-  const StatCard = ({ label, value, color = 'text-[var(--text-primary)]', bg = 'bg-[#080808]', border = 'border-[var(--border-color)]' }) => (
-    <div className={`${bg} ${border} border p-5 flex flex-col justify-between h-full`}>
-      <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-2 border-b border-[var(--border-color)] pb-1">{label}</p>
+  const StatCard = ({ label, value, color = 'text-slate-900 dark:text-zinc-100', bg = 'bg-white dark:bg-[#151518]', border = 'border-zinc-200 dark:border-[#D4AF37]/20' }) => (
+    <div className={`${bg} ${border} border p-5 flex flex-col justify-between h-full transition-colors duration-200`}>
+      <p className="text-[9px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest mb-2 border-b border-zinc-200 dark:border-[#D4AF37]/20 pb-1">{label}</p>
       <h2 className={`text-2xl font-black ${color}`}>{value}</h2>
     </div>
   );
 
   return (
-    <div className="p-6 h-full overflow-auto space-y-8 bg-[var(--bg-main)]" dir={isRtl ? 'rtl' : 'ltr'} style={{}}>
+    <div className="p-6 h-full overflow-auto space-y-8 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
 
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-black text-white uppercase tracking-widest">{isRtl ? 'لوحة القيادة' : 'Command Center'}</h2>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest">{isRtl ? 'لوحة القيادة' : 'Command Center'}</h2>
         
         {/* Quick Time-Context Date Filters */}
         <div className="flex bg-[#111] border border-[#333] p-1 shadow-lg">
@@ -4989,17 +4989,26 @@ export default function App() {
   const [language, setLanguage] = useState('ar');
   const isRtl = language === 'ar';
   const [collapsed, setCollapsed] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [branchId, setBranchId] = useState(() => localStorage.getItem('active_branch_id') || null);
   const [activeBranchName, setActiveBranchName] = useState(() => localStorage.getItem('active_branch_name') || '');
   const [cloudReady, setCloudReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-
   useEffect(() => {
+    localStorage.setItem('pos_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  useEffect(() => {
+    window.toggleTheme = () => {
+      setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+    };
+    return () => {
+      delete window.toggleTheme;
+    };
+  }, []);
 
   // Auth
   const [currentUser, setCurrentUser] = useState(null);
@@ -5041,7 +5050,7 @@ export default function App() {
         main_safe_balance: mainSafeBalance, bank_balance: bankBalance,
       });
     }
-  }, [currency, taxRate, enableServiceFee, serviceFee, storeName, invoiceLogo, invoiceHeader, invoiceFooter, branchId, cloudReady]);
+  }, [currency, taxRate, enableServiceFee, serviceFee, storeName, invoiceLogo, invoiceHeader, invoiceFooter, branchId, cloudReady, theme, language]);
 
   const [categories, setCategories] = useState(() => JSON.parse(localStorage.getItem('pos_categories')) || CATEGORIES);
   const [items, setItems] = useState(() => JSON.parse(localStorage.getItem('pos_items')) || INITIAL_ITEMS);
@@ -5644,7 +5653,7 @@ export default function App() {
 
 
   return (
-    <div className="flex h-screen w-screen bg-slate-50 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="flex h-screen w-screen bg-white text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Offline Warning Banner */}
       {!isOnline && (
@@ -5669,7 +5678,7 @@ export default function App() {
         />
       )}
 
-      <main className={`flex-1 flex flex-col min-h-0 bg-[var(--bg-deep)] relative`}>
+      <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200 relative">
         {!currentUser ? (
           <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
         ) : (
@@ -5713,7 +5722,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
               {renderScreen()}
             </div>
           </>

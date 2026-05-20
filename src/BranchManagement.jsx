@@ -33,14 +33,14 @@ function AddBranchModal({ isOpen, onClose, onSubmit, isRtl }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center" onClick={() => { if (!loading) { reset(); onClose(); } }}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 border border-zinc-200 dark:border-[#D4AF37]/20 bg-white dark:bg-[#161616] shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease]"
+      <div className="relative w-full max-w-lg mx-4 border border-zinc-200 dark:border-[#D4AF37]/20 bg-white dark:bg-[#151518] shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease]"
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="px-8 py-6 border-b border-zinc-200 dark:border-[#D4AF37]/20 flex items-center justify-between bg-slate-100 dark:bg-black/20">
+        <div className="px-8 py-6 border-b border-zinc-200 dark:border-[#D4AF37]/20 flex items-center justify-between bg-slate-50 dark:bg-[#0a0a0c]">
           <div>
             <h3 className="text-lg font-black text-slate-900 dark:text-zinc-100 uppercase tracking-wider">
               {isRtl ? '➕ فرع جديد' : '➕ New Branch'}
@@ -91,7 +91,7 @@ function AddBranchModal({ isOpen, onClose, onSubmit, isRtl }) {
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-zinc-200 dark:border-[#D4AF37]/20 bg-slate-100 dark:bg-black/20 flex items-center justify-between gap-4">
+        <div className="px-8 py-6 border-t border-zinc-200 dark:border-[#D4AF37]/20 bg-slate-50 dark:bg-[#0a0a0c] flex items-center justify-between gap-4">
           <button onClick={() => { reset(); onClose(); }} disabled={loading}
             className="px-6 py-3 text-slate-500 dark:text-zinc-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-900 dark:text-zinc-100 transition-colors">
             {isRtl ? 'إلغاء' : 'Cancel'}
@@ -162,7 +162,7 @@ export default function BranchManagement({ language }) {
   const activeCount = branches.filter(b => b.is_active).length;
 
   return (
-    <div className="p-6 md:p-10 space-y-8 min-h-full bg-slate-50 dark:bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="p-6 md:p-10 space-y-8 min-h-full bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
@@ -192,8 +192,8 @@ export default function BranchManagement({ language }) {
           { label: isRtl ? 'فروع معطلة' : 'Inactive', value: branches.length - activeCount, color: 'text-rose-400', icon: '⏸️' },
           { label: isRtl ? 'الخزائن المُزوّدة' : 'Safes Provisioned', value: branches.length, color: 'text-[#D4AF37]', icon: '🏦' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white dark:bg-[#161616] border border-zinc-200 dark:border-[#D4AF37]/20 p-5 flex items-center gap-4 hover:border-[#D4AF37]/40 transition-colors shadow-lg">
-            <div className={`w-12 h-12 rounded-none flex items-center justify-center text-2xl bg-black/30 border border-white/5 ${stat.color}`}>
+          <div key={i} className="bg-white dark:bg-[#151518] border border-zinc-200 dark:border-[#D4AF37]/20 p-5 flex items-center gap-4 hover:border-[#D4AF37]/40 transition-colors shadow-lg">
+            <div className={`w-12 h-12 rounded-none flex items-center justify-center text-2xl bg-slate-50 dark:bg-black/30 border border-zinc-200 dark:border-white/5 ${stat.color}`}>
               {stat.icon}
             </div>
             <div>
@@ -205,9 +205,9 @@ export default function BranchManagement({ language }) {
       </div>
 
       {/* Branches Table */}
-      <div className="bg-white dark:bg-[#161616] border border-zinc-200 dark:border-[#D4AF37]/20 shadow-lg overflow-hidden">
+      <div className="bg-white dark:bg-[#151518] border border-zinc-200 dark:border-[#D4AF37]/20 shadow-lg overflow-hidden">
         {/* Table Header */}
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-[#D4AF37]/20 flex items-center justify-between bg-slate-100 dark:bg-black/20">
+        <div className="px-6 py-4 border-b border-zinc-200 dark:border-[#D4AF37]/20 flex items-center justify-between bg-slate-50 dark:bg-[#0a0a0c]">
           <div className="flex items-center gap-3">
             <span className="text-sm drop-shadow-md">🏢</span>
             <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[3px]">
@@ -247,7 +247,7 @@ export default function BranchManagement({ language }) {
 
         {/* Data Rows */}
         {!loading && branches.length > 0 && (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-zinc-200 dark:divide-white/5">
             {/* Column Headers */}
             <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 dark:bg-black/40 border-b border-[#D4AF37]/10">
               <div className="col-span-1 text-[8px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest">#</div>
@@ -260,7 +260,7 @@ export default function BranchManagement({ language }) {
 
             {branches.map((branch, idx) => (
               <div key={branch.id}
-                className={`grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-100 dark:bg-black/20 transition-colors group ${!branch.is_active ? 'opacity-40' : ''}`}>
+                className={`grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 dark:hover:bg-black/20 transition-all duration-200 group ${!branch.is_active ? 'opacity-40' : ''}`}>
                 {/* Index */}
                 <div className="col-span-1">
                   <span className="text-xs font-black text-zinc-600">{String(idx + 1).padStart(2, '0')}</span>
