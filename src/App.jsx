@@ -5088,7 +5088,14 @@ export default function App() {
         try {
           branch = await SB.getOrCreateBranch(machineId, storeName);
         } catch (branchErr) {
-          console.error('⚠️ Initial Supabase Query Error (getOrCreateBranch):', branchErr);
+          console.error('⚠️ Initial Supabase Query Error (getOrCreateBranch) Details:', {
+            message: branchErr.message,
+            code: branchErr.code,
+            details: branchErr.details,
+            hint: branchErr.hint,
+            status: branchErr.status,
+            stack: branchErr.stack
+          });
         }
 
         if (cancelled) return;
@@ -5166,7 +5173,14 @@ export default function App() {
         // Mark cloud as ready regardless — login flow can operate independently
         setCloudReady(true);
       } catch (err) {
-        console.error('Cloud boot failed, using local cache:', err);
+        console.error('❌ Cloud boot failed, using local cache. Details:', {
+          message: err.message,
+          stack: err.stack,
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          status: err.status
+        });
         // Still mark as ready so login isn't blocked
         setCloudReady(true);
       }
@@ -5343,7 +5357,14 @@ export default function App() {
         if (authErr.message === 'BRANCH_DEACTIVATED') {
           return isRtl ? 'الفرع التابع له معطّل حالياً' : 'Your assigned branch is currently deactivated';
         }
-        console.error('⚠️ Cloud auth rejected or failed:', authErr);
+        console.error('⚠️ Cloud auth rejected or failed. Details:', {
+          message: authErr.message,
+          stack: authErr.stack,
+          code: authErr.code,
+          details: authErr.details,
+          hint: authErr.hint,
+          status: authErr.status
+        });
       }
       console.log('☁️ Cloud Auth Response for PIN:', id, '->', cloudUser);
 

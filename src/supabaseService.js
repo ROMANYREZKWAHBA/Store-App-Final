@@ -5,13 +5,23 @@ import { supabase } from './supabaseClient';
 // ============================================================
 export async function getOrCreateBranch(machineId, branchName = 'Main Branch') {
   // Try to find existing branch
-  const { data: existing } = await supabase
+  const { data: existing, error: findError } = await supabase
     .from('branches')
     .select('*')
     .eq('machine_id', machineId)
     .single();
 
   if (existing) return existing;
+  if (findError && findError.code !== 'PGRST116') { // PGRST116 is code for no rows found
+    console.error('❌ getOrCreateBranch: failed to find branch:', {
+      message: findError.message,
+      code: findError.code,
+      details: findError.details,
+      hint: findError.hint,
+      status: findError.status,
+      machineId
+    });
+  }
 
   // Create new branch
   const { data: created, error } = await supabase
@@ -20,12 +30,34 @@ export async function getOrCreateBranch(machineId, branchName = 'Main Branch') {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ getOrCreateBranch: failed to create branch:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      machineId,
+      branchName
+    });
+    throw error;
+  }
   return created;
 }
 
 export async function checkTrialStatus(branchId) {
-  const { data } = await supabase.from('branches').select('*').eq('id', branchId).single();
+  const { data, error } = await supabase.from('branches').select('*').eq('id', branchId).single();
+  if (error) {
+    console.error('❌ checkTrialStatus failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return { expired: true };
+  }
   if (!data) return { expired: true };
   if (data.activated) return { expired: false, activated: true };
   if (data.trial_activated && data.trial_start_date) {
@@ -41,44 +73,114 @@ export async function checkTrialStatus(branchId) {
 // ============================================================
 async function fetchAll(table, branchId) {
   const { data, error } = await supabase.from(table).select('*').eq('branch_id', branchId);
-  if (error) { console.error(`Fetch ${table}:`, error); return []; }
+  if (error) {
+    console.error(`❌ Fetch ${table} failed:`, {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return [];
+  }
   return data || [];
 }
 
 async function upsertRow(table, row) {
   const { error } = await supabase.from(table).upsert(row, { onConflict: 'id' });
-  if (error) console.error(`Upsert ${table}:`, error);
+  if (error) {
+    console.error(`❌ Upsert ${table} failed:`, {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      payload: row
+    });
+  }
 }
 
 async function insertRow(table, row) {
   const { error } = await supabase.from(table).insert(row);
-  if (error) console.error(`Insert ${table}:`, error);
+  if (error) {
+    console.error(`❌ Insert ${table} failed:`, {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      payload: row
+    });
+  }
 }
 
 async function deleteRow(table, id) {
   const { error } = await supabase.from(table).delete().eq('id', id);
-  if (error) console.error(`Delete ${table}:`, error);
+  if (error) {
+    console.error(`❌ Delete from ${table} failed:`, {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      id
+    });
+  }
 }
 
 async function updateRow(table, id, updates) {
   const { error } = await supabase.from(table).update(updates).eq('id', id);
-  if (error) console.error(`Update ${table}:`, error);
+  if (error) {
+    console.error(`❌ Update ${table} failed:`, {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      id,
+      updates
+    });
+  }
 }
 
 // ============================================================
 // SETTINGS
 // ============================================================
 export async function fetchSettings(branchId) {
-  const { data } = await supabase.from('settings').select('*').eq('branch_id', branchId).single();
+  const { data, error } = await supabase.from('store_settings').select('*').eq('branch_id', branchId).single();
+  if (error) {
+    console.error('❌ fetchSettings failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return null;
+  }
   return data;
 }
 
 export async function saveSettings(branchId, settings) {
-  await supabase.from('settings').upsert({
+  const { error } = await supabase.from('store_settings').upsert({
     branch_id: branchId,
     ...settings,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'branch_id' });
+
+  if (error) {
+    console.error('❌ saveSettings failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId,
+      settings
+    });
+  }
 }
 
 // ============================================================
@@ -90,7 +192,17 @@ export async function fetchUsers(branchId) {
     .from('users')
     .select('*, assigned_branch:branches!assigned_branch_id(id, name)')
     .eq('branch_id', branchId);
-  if (error) { console.error('Fetch users:', error); return []; }
+  if (error) { 
+    console.error('❌ Fetch users failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    }); 
+    return []; 
+  }
   return (data || []).map(u => ({
     id: u.id, name: u.name, username: u.username, password: u.password,
     pin: u.pin, role: u.role, isActive: u.is_active, recoveryCode: u.recovery_code,
@@ -131,10 +243,17 @@ export async function verifyPinLogin(pin) {
   console.log('🔍 SB.verifyPinLogin -> Request PIN:', pin, '| Error:', error, '| Data:', data);
 
   if (error) { 
+    console.error('❌ verifyPinLogin failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      pin
+    });
     if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
       throw new Error('TABLE_MISSING');
     }
-    console.error('verifyPinLogin:', error); 
     return null; 
   }
   if (!data) return null;
@@ -181,10 +300,18 @@ export async function verifyCredentialsLogin(username, password, role) {
     .maybeSingle();
 
   if (error) { 
+    console.error('❌ verifyCredentialsLogin failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      username,
+      role
+    });
     if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
       throw new Error('TABLE_MISSING');
     }
-    console.error('verifyCredentialsLogin:', error); 
     return null; 
   }
   if (!data) return null;
@@ -400,39 +527,96 @@ export async function saveJsonRow(table, branchId, row) {
 // STAFF PAYMENTS (map: userId -> payments[])
 // ============================================================
 export async function fetchStaffPayments(branchId) {
-  const { data } = await supabase.from('staff_payments').select('*').eq('branch_id', branchId);
+  const { data, error } = await supabase.from('staff_payments').select('*').eq('branch_id', branchId);
+  if (error) {
+    console.error('❌ fetchStaffPayments failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return {};
+  }
   const map = {};
   (data || []).forEach(r => { map[r.user_id] = r.payments || []; });
   return map;
 }
 
 export async function saveStaffPayments(branchId, userId, payments) {
-  await supabase.from('staff_payments').upsert({
+  const { error } = await supabase.from('staff_payments').upsert({
     branch_id: branchId, user_id: userId, payments,
   }, { onConflict: 'branch_id,user_id' });
+  if (error) {
+    console.error('❌ saveStaffPayments failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId,
+      userId,
+      payments
+    });
+  }
 }
 
 // ============================================================
 // USER PERMISSIONS
 // ============================================================
 export async function fetchUserPermissions(branchId) {
-  const { data } = await supabase.from('user_permissions').select('*').eq('branch_id', branchId);
+  const { data, error } = await supabase.from('user_permissions').select('*').eq('branch_id', branchId);
+  if (error) {
+    console.error('❌ fetchUserPermissions failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return {};
+  }
   const map = {};
   (data || []).forEach(r => { map[r.user_id] = r.permissions || []; });
   return map;
 }
 
 export async function saveUserPermissions(branchId, userId, perms) {
-  await supabase.from('user_permissions').upsert({
+  const { error } = await supabase.from('user_permissions').upsert({
     branch_id: branchId, user_id: userId, permissions: perms,
   }, { onConflict: 'branch_id,user_id' });
+  if (error) {
+    console.error('❌ saveUserPermissions failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId,
+      userId,
+      perms
+    });
+  }
 }
 
 // ============================================================
 // BALANCE FIELDS (stored in settings)
 // ============================================================
 export async function fetchBalances(branchId) {
-  const { data } = await supabase.from('settings').select('*').eq('branch_id', branchId).single();
+  const { data, error } = await supabase.from('store_settings').select('*').eq('branch_id', branchId).single();
+  if (error) {
+    console.error('❌ fetchBalances failed:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      branchId
+    });
+    return { drawerBalance: 0, mainSafeBalance: 0, bankBalance: 0 };
+  }
   if (!data) return { drawerBalance: 0, mainSafeBalance: 0, bankBalance: 0 };
   return {
     drawerBalance: Number(data.drawer_balance) || 0,
