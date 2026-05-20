@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function SubscriptionUpgrade({ onSubscribe, onLogout, language }) {
+export default function SubscriptionUpgrade({ onSubscribe, onLogout, language, currentUser }) {
   const isRtl = language === 'ar';
   const [activationCode, setActivationCode] = useState('');
   const [error, setError] = useState('');
@@ -83,12 +83,14 @@ export default function SubscriptionUpgrade({ onSubscribe, onLogout, language })
           </a>
         </div>
 
-        <button
-          onClick={onLogout}
-          className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-2 block mx-auto font-bold"
-        >
-          {isRtl ? '✕ تسجيل الخروج' : '✕ Logout'}
-        </button>
+        {currentUser && (
+          <button
+            onClick={onLogout}
+            className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-2 block mx-auto font-bold"
+          >
+            {isRtl ? '✕ تسجيل الخروج' : '✕ Logout'}
+          </button>
+        )}
       </div>
     </div>
   );

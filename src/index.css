@@ -45,8 +45,8 @@ body[dir="rtl"] {
   font-family: var(--font-ar);
 }
 
-/* Base styles for the sharp edges */
-* {
+/* Base styles for the sharp edges, excluding modern login UI elements */
+*:not(.login-rounded, .login-rounded *) {
   border-radius: 0 !important;
   box-shadow: none !important;
 }

@@ -3075,6 +3075,9 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
   const [isFetchingHwid, setIsFetchingHwid] = useState(false);
   const [hwidError, setHwidError] = useState(false);
 
+  // Focus-activated keypad state
+  const [isKeypadVisible, setIsKeypadVisible] = useState(false);
+
   const handlePin = async () => {
     setIsLoggingIn(true);
     const err = await onLogin(pin, undefined, 'Cashier');
@@ -3152,100 +3155,234 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
     }
   };
 
-  useEffect(() => { setError(null); setPin(''); setUsername(''); setPassword(''); }, [selectedRole]);
+  const handlePinChange = (e) => {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    if (value.length <= 6) {
+      setPin(value);
+    }
+  };
+
+  useEffect(() => { setError(null); setPin(''); setUsername(''); setPassword(''); setIsKeypadVisible(false); }, [selectedRole]);
 
   return (
-    <div className="absolute inset-0 min-h-screen w-full bg-slate-100 dark:bg-[#0a0a0c] flex flex-col items-center justify-center p-4 overflow-y-auto z-[300]" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="absolute top-8 left-8 right-8 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#0066FF] flex items-center justify-center">🚀</div>
-          <span className="font-black tracking-widest text-xl uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
+    <div className="login-rounded min-h-screen w-full bg-slate-50 dark:bg-black flex flex-col md:grid md:grid-cols-2 overflow-x-hidden relative animate-[loginFadeIn_0.5s_ease-out] transition-all duration-500 ease-in-out" dir={isRtl ? 'rtl' : 'ltr'}>
+      
+      {/* Styles for advanced premium animations */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes loginFadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glowPulse {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.25), inset 0 0 15px rgba(212, 175, 55, 0.1);
+            transform: scale(1) rotate(0deg);
+          }
+          50% {
+            box-shadow: 0 0 45px rgba(0, 102, 255, 0.45), inset 0 0 25px rgba(212, 175, 55, 0.25);
+            transform: scale(1.03) rotate(180deg);
+          }
+        }
+        @keyframes glowPulseInner {
+          0%, 100% { transform: scale(1); opacity: 0.85; }
+          50% { transform: scale(1.08); opacity: 1; }
+        }
+        @keyframes slideUpFade {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}} />
+
+      {/* Left Side (Visuals) */}
+      <div className="hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-900 to-black text-white p-12 relative overflow-hidden select-none">
+        {/* Glowing backdrop decorative gradients */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,102,255,0.12),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(212,175,55,0.06),transparent_55%)]" />
+        
+        {/* Animated 3D-like glowing logo */}
+        <div className="relative flex items-center justify-center w-72 h-72 mb-10">
+          <div className="absolute w-60 h-60 rounded-full border border-dashed border-[#D4AF37]/35 animate-[spin_40s_linear_infinite]" />
+          <div className="absolute w-48 h-48 rounded-full border-4 border-double border-t-[#0066FF] border-b-[#D4AF37] border-l-transparent border-r-transparent animate-[glowPulse_10s_ease-in-out_infinite]" />
+          <div className="absolute w-36 h-36 rounded-full bg-gradient-to-tr from-[#0066FF]/15 to-[#D4AF37]/15 flex items-center justify-center backdrop-blur-sm border border-white/5 animate-[glowPulseInner_5s_ease-in-out_infinite]">
+            <span className="text-6xl filter drop-shadow-[0_0_15px_rgba(212,175,55,0.5)]">🚀</span>
+          </div>
         </div>
-        <button onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-          className="px-6 py-2 border border-[var(--border-color)] text-[#D4AF37] font-black uppercase text-xs hover:bg-[var(--bg-card)] transition-all">
-          {isRtl ? 'English' : 'العربية'}
-        </button>
+
+        {/* Branding & Marketing message */}
+        <div className="text-center max-w-md space-y-4 z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-black tracking-widest text-[#D4AF37] uppercase">
+            ⚡ STOREPILOT PLATINUM
+          </div>
+          <h3 className="text-3xl font-black tracking-tight uppercase">
+            {isRtl ? 'الجيل القادم من نقاط البيع' : 'The Next Generation POS'}
+          </h3>
+          <p className="text-xs text-zinc-400 font-bold tracking-wide leading-relaxed uppercase">
+            {isRtl 
+              ? 'نظام تشغيل متكامل لإدارة المبيعات والمخزون والموظفين بكفاءة متناهية.' 
+              : 'Unified Retail OS powering enterprise branch logistics, shifts, and high-frequency cash operations.'}
+          </p>
+        </div>
       </div>
 
-      <div className="w-full max-w-md bg-white dark:bg-[#161618] border border-zinc-200 dark:border-[#D4AF37]/20 p-10 space-y-10 shadow-none">
-        <div className="text-center">
-          <h2 className={`text-4xl font-black text-[var(--text-primary)] mb-2 ${isRtl ? '' : 'tracking-tighter uppercase'}`}>{isRtl ? 'سجل دخولك' : 'Secure Login'}</h2>
-          <p className={`text-[#D4AF37] font-black text-[10px] ${isRtl ? '' : 'uppercase tracking-widest'}`}>{isRtl ? 'بوابة التجار المحترفين' : 'Retail OS Bloomberg Edition'}</p>
+      {/* Right Side (Form) */}
+      <div className="flex items-center justify-center bg-slate-50 dark:bg-black p-6 md:p-12 relative min-h-screen">
+        {/* Language selector and top branding for mobile viewports */}
+        <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
+          <div className="flex items-center gap-2 md:hidden">
+            <div className="w-8 h-8 rounded-lg bg-[#0066FF] flex items-center justify-center text-white text-base">🚀</div>
+            <span className="font-black tracking-widest text-sm uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
+          </div>
+          <button onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
+            className="px-5 py-2.5 border border-zinc-300 dark:border-zinc-800 text-[#D4AF37] font-black uppercase text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-all ml-auto">
+            {isRtl ? 'English' : 'العربية'}
+          </button>
         </div>
 
-        <div className="flex bg-[var(--bg-deep)] border border-[var(--border-color)]">
-          {['Cashier', 'Admin', 'Owner'].map(role => (
-            <button key={role} onClick={() => setSelectedRole(role)}
-              className={`flex-1 py-4 font-black text-[11px] uppercase tracking-widest transition-all ${selectedRole === role ? 'bg-[#0066FF] text-[var(--text-primary)]' : 'text-slate-600 hover:text-[var(--text-muted)]'}`}>
-              {role}
-            </button>
-          ))}
+        {/* Center-aligned Glassmorphism card with fade-in on load */}
+        <div className="w-full max-w-md bg-white/80 dark:bg-[#161618]/70 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 p-8 md:p-10 space-y-8 shadow-2xl rounded-2xl animate-[loginFadeIn_0.5s_ease-out] transition-all duration-500 ease-in-out">
+          <div className="text-center space-y-2">
+            <div className="hidden md:flex justify-center gap-2 items-center">
+              <span className="font-black tracking-widest text-lg uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
+            </div>
+            <h2 className={`text-3xl font-black text-[var(--text-primary)] tracking-tight ${isRtl ? '' : 'uppercase'}`}>
+              {isRtl ? 'سجل دخولك' : 'Secure Login'}
+            </h2>
+            <p className="text-[#D4AF37] font-black text-[10px] uppercase tracking-widest">
+              {isRtl ? 'بوابة التجار المحترفين' : 'Retail OS Bloomberg Edition'}
+            </p>
+          </div>
+
+          {/* Role Selector Tabs */}
+          <div className="flex bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/70 p-1.5 rounded-2xl">
+            {['Cashier', 'Admin', 'Owner'].map(role => (
+              <button 
+                key={role} 
+                type="button"
+                onClick={() => setSelectedRole(role)}
+                className={`flex-1 py-3 font-black text-[11px] uppercase tracking-widest rounded-xl transition-all duration-300 ${
+                  selectedRole === role 
+                    ? 'bg-[#0066FF] text-white shadow-md' 
+                    : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+
+          {error && (
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+              <p className="text-rose-500 text-[10px] font-black text-center uppercase tracking-widest">⚠️ {error}</p>
+            </div>
+          )}
+
+          {selectedRole === 'Cashier' ? (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                  {isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={pin}
+                    onChange={handlePinChange}
+                    onFocus={() => setIsKeypadVisible(true)}
+                    onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
+                    placeholder="••••••"
+                    maxLength={6}
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] text-center text-xl tracking-[0.5em] outline-none focus:border-[#0066FF] rounded-xl transition-all duration-300"
+                  />
+                </div>
+              </div>
+
+              {/* Hidden Keypad: Appears only on focus with transition animation */}
+              {isKeypadVisible && (
+                <div className="grid grid-cols-3 gap-2.5 animate-[slideUpFade_0.25s_ease-out]">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
+                    <button
+                      key={btn}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()} // Prevents password field blur
+                      onClick={() => {
+                        if (btn === 'CLR') setPin('');
+                        else if (btn === '⌫') setPin(p => p.slice(0, -1));
+                        else if (pin.length < 6) setPin(p => p + String(btn));
+                      }}
+                      className="h-12 bg-zinc-100/80 hover:bg-zinc-200 dark:bg-zinc-800/40 dark:hover:bg-zinc-700/60 text-[var(--text-primary)] text-base font-black border border-zinc-200/50 dark:border-zinc-700/40 hover:border-[#0066FF] dark:hover:border-[#0066FF] hover:text-[#0066FF] dark:hover:text-[#0066FF] rounded-xl transition-all flex items-center justify-center"
+                    >
+                      {btn}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button 
+                type="button"
+                onClick={handlePin} 
+                disabled={pin.length < 4 || isLoggingIn}
+                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20"
+              >
+                {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                  {isRtl ? 'اسم المستخدم' : 'Username'}
+                </label>
+                <input 
+                  type="text" 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                  {isRtl ? 'كلمة المرور' : 'Password'}
+                </label>
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                />
+              </div>
+              <button 
+                type="button"
+                onClick={handleCredentials} 
+                disabled={isLoggingIn}
+                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
+              >
+                {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
+              </button>
+            </div>
+          )}
+
+          <button onClick={handleRecovery} className="w-full text-[9px] font-black text-[#D4AF37] uppercase tracking-[2px] opacity-60 hover:opacity-100 transition-all block mt-4">
+            {isRtl ? 'نسيت بيانات الدخول؟ (استعادة)' : 'Forgotten Credentials? (Recover)'}
+          </button>
         </div>
-
-        {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20">
-            <p className="text-rose-500 text-[10px] font-black text-center uppercase tracking-widest">⚠️ {error}</p>
-          </div>
-        )}
-
-        {selectedRole === 'Cashier' ? (
-          <div className="space-y-10">
-            <div className="flex justify-center gap-4">
-              {[0, 1, 2, 3, 4, 5].map(i => (
-                <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${pin.length > i ? 'bg-[#0066FF] border-[#0066FF] scale-110' : 'border-[var(--border-color)] scale-100'}`} />
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
-                <button key={btn} onClick={() => {
-                  if (btn === 'CLR') setPin('');
-                  else if (btn === '⌫') setPin(p => p.slice(0, -1));
-                  else if (pin.length < 6) setPin(p => p + btn);
-                }}
-                  className="h-16 bg-[#111] text-[var(--text-primary)] text-xl font-black border border-[var(--border-color)] hover:bg-[#0066FF] hover:text-white transition-all flex items-center justify-center">
-                  {btn}
-                </button>
-              ))}
-            </div>
-            <button onClick={handlePin} disabled={pin.length < 4 || isLoggingIn}
-              className="w-full py-5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-sm transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20">
-              {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
-              <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF]" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest">{isRtl ? 'كلمة المرور' : 'Password'}</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF]" />
-            </div>
-            <button onClick={handleCredentials} disabled={isLoggingIn}
-              className="w-full py-5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-sm transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20">
-              {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
-            </button>
-          </div>
-        )}
-        <button onClick={handleRecovery} className="w-full text-[10px] font-black text-[#D4AF37] uppercase tracking-[2px] opacity-60 hover:opacity-100 transition-all">
-          {isRtl ? 'نسيت بيانات الدخول؟ (استعادة)' : 'Forgotten Credentials? (Recover)'}
-        </button>
       </div>
 
+      {/* Recovery Modal remains perfectly functional */}
       {showRecoveryModal && (
         <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[400] p-4 text-[var(--text-primary)]">
-          <div className="bg-[var(--bg-sidebar)] border border-rose-500/30 p-8 max-w-sm w-full shadow-2xl relative">
-            <h3 className="text-xl font-black text-rose-500 mb-6 uppercase tracking-widest border-b border-rose-500/20 pb-2">{isRtl ? 'استعادة الحساب' : 'Security Recovery'}</h3>
+          <div className="bg-[var(--bg-sidebar)] border border-rose-500/30 p-8 max-w-sm w-full shadow-2xl rounded-2xl relative">
+            <h3 className="text-xl font-black text-rose-500 mb-6 uppercase tracking-widest border-b border-rose-500/20 pb-2">
+              {isRtl ? 'استعادة الحساب' : 'Security Recovery'}
+            </h3>
             
             {recoveryStep === 'hwid' && (
               <div className="space-y-4">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">{isRtl ? 'يرجى إرسال المعرف أدناه للمسؤول للحصول على كود إعادة التعيين.' : 'Provide the Hardware ID below to your administrator for a reset code.'}</p>
+                <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">
+                  {isRtl ? 'يرجى إرسال المعرف أدناه للمسؤول للحصول على كود إعادة التعيين.' : 'Provide the Hardware ID below to your administrator for a reset code.'}
+                </p>
                 
                 {isFetchingHwid ? (
-                  <div className="bg-[var(--bg-deep)] p-4 mb-1 font-mono text-[10px] text-amber-500 text-center border border-rose-500/20 animate-pulse font-black uppercase tracking-wider">
+                  <div className="bg-[var(--bg-deep)] p-4 mb-1 font-mono text-[10px] text-amber-500 text-center border border-rose-500/20 animate-pulse font-black uppercase tracking-wider rounded-xl">
                     {isRtl ? 'جاري تحميل معرف الجهاز...' : 'Loading Machine ID (retrying)...'}
                   </div>
                 ) : hwidError ? (
@@ -3253,12 +3390,12 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
                     <button 
                       type="button"
                       onClick={fetchHwidWithRetry}
-                      className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-widest transition-all">
+                      className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl">
                       {isRtl ? 'إعادة المحاولة يدوياً' : 'Manual Retry'}
                     </button>
                   </div>
                 ) : (
-                  <div className="bg-[var(--bg-deep)] p-3 mb-1 font-mono text-[10px] text-teal-400 break-all select-all border border-[var(--border-color)]" style={{ userSelect: 'all', cursor: 'pointer' }}>
+                  <div className="bg-[var(--bg-deep)] p-3 mb-1 font-mono text-[10px] text-teal-400 break-all select-all border border-[var(--border-color)] rounded-xl" style={{ userSelect: 'all', cursor: 'pointer' }}>
                     {hwid || 'BROWSER-TEST-ID-2026'}
                   </div>
                 )}
@@ -3271,14 +3408,14 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
                   value={recoveryKey} 
                   onChange={e => setRecoveryKey(e.target.value)}
                   placeholder={isRtl ? 'أدخل الكود هنا...' : 'Enter Recovery Key...'} 
-                  className="w-full bg-[var(--bg-deep)] border border-rose-500/30 px-4 py-3 font-bold text-[var(--text-primary)] outline-none mb-4" 
+                  className="w-full bg-[var(--bg-deep)] border border-rose-500/30 px-4 py-3 font-bold text-[var(--text-primary)] outline-none mb-4 rounded-xl" 
                 />
                 
                 <div className="flex gap-2">
-                  <button onClick={() => setShowRecoveryModal(false)} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest">{isRtl ? 'إلغاء' : 'Cancel'}</button>
+                  <button onClick={() => setShowRecoveryModal(false)} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl">{isRtl ? 'إلغاء' : 'Cancel'}</button>
                   <button 
                     onClick={verifyRecoveryKey}
-                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-[10px] tracking-widest transition-all">
+                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl">
                     {isRtl ? 'تحقق ومتابعة' : 'Verify & Proceed'}
                   </button>
                 </div>
@@ -3287,26 +3424,32 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
 
             {recoveryStep === 'reset' && (
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'اختر حساباً لإعادة تعيينه' : 'Select User Account'}</label>
-                <select value={selectedUserToReset} onChange={e => setSelectedUserToReset(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] p-3 text-[var(--text-primary)] font-bold outline-none mb-2">
+                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">
+                  {isRtl ? 'اختر حساباً لإعادة تعيينه' : 'Select User Account'}
+                </label>
+                <select 
+                  value={selectedUserToReset} 
+                  onChange={e => setSelectedUserToReset(e.target.value)} 
+                  className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] p-3 text-[var(--text-primary)] font-bold outline-none mb-2 rounded-xl"
+                >
                   <option value="">{isRtl ? 'اختر مستخدماً...' : 'Choose user...'}</option>
                   {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
                 </select>
                 <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'اسم المستخدم الجديد' : 'New Username'}</label>
-                        <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none" />
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'كلمة المرور الجديدة' : 'New Password'}</label>
-                        <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none" />
-                    </div>
+                  <div>
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'اسم المستخدم الجديد' : 'New Username'}</label>
+                    <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'كلمة المرور الجديدة' : 'New Password'}</label>
+                    <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none rounded-xl" />
+                  </div>
                 </div>
                 <div className="flex gap-3 pt-4">
-                   <button onClick={() => setRecoveryStep('hwid')} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest">{isRtl ? 'إلغاء' : 'Cancel'}</button>
-                   <button onClick={handleResetPassword} disabled={!selectedUserToReset || !newUsername || !newPassword} className="flex-[2] py-3 bg-[#0066FF] text-white font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-[#0066FF]/20">
-                     💾 {isRtl ? 'حفظ ودخول' : 'Save & Login'}
-                   </button>
+                  <button onClick={() => setRecoveryStep('hwid')} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl">{isRtl ? 'إلغاء' : 'Cancel'}</button>
+                  <button onClick={handleResetPassword} disabled={!selectedUserToReset || !newUsername || !newPassword} className="flex-[2] py-3 bg-[#0066FF] text-white font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-[#0066FF]/20 rounded-xl">
+                    💾 {isRtl ? 'حفظ ودخول' : 'Save & Login'}
+                  </button>
                 </div>
               </div>
             )}
@@ -5067,9 +5210,20 @@ export default function App() {
   const [cloudReady, setCloudReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(() => {
+    const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+    const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+    const saas = checkSaaSStatus({
+      subscription_status: localStatus,
+      trial_start_date: localTrialStart,
+      subscription_end_date: localSubEnd
+    });
+    return saas.expired;
+  });
   const [trialDaysLeft, setTrialDaysLeft] = useState(null);
   const [subStatus, setSubStatus] = useState(() => localStorage.getItem('pos_subscription_status') || 'trial');
+  const subscriptionActive = !subscriptionExpired;
 
   useEffect(() => {
     localStorage.setItem('pos_theme', theme);
@@ -5772,8 +5926,8 @@ export default function App() {
   };
 
   const renderScreen = () => {
+    if (!subscriptionActive) return <SubscriptionUpgrade onSubscribe={handleDummySubscribe} onLogout={handleLogout} language={language} currentUser={currentUser} />;
     if (!currentUser) return null;
-    if (subscriptionExpired) return null;
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
       case 'dashboard': return <Dashboard items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
@@ -5816,13 +5970,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Subscription Upgrade Guard */}
-      {currentUser && subscriptionExpired ? (
+      {!subscriptionActive ? (
         <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
           <SubscriptionUpgrade
             onSubscribe={handleDummySubscribe}
             onLogout={handleLogout}
             language={language}
+            currentUser={currentUser}
           />
         </main>
       ) : (
