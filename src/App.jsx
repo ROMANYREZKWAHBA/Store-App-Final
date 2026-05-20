@@ -3072,6 +3072,8 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
   const [newPassword, setNewPassword] = useState('');
   const isRtl = language === 'ar';
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isFetchingHwid, setIsFetchingHwid] = useState(false);
+  const [hwidError, setHwidError] = useState(false);
 
   const handlePin = async () => {
     setIsLoggingIn(true);
@@ -3087,15 +3089,41 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
     setIsLoggingIn(false);
   };
 
-  const handleRecovery = async () => {
-    try {
-      const id = await window.electronAPI.getMachineId();
-      setHwid(id);
-    } catch(e) {
-      setHwid('Error loading HWID');
+  const fetchHwidWithRetry = async () => {
+    setIsFetchingHwid(true);
+    setHwidError(false);
+    setHwid('');
+    
+    let attempts = 0;
+    let id = null;
+    
+    while (attempts < 3) {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.getMachineId === 'function') {
+          id = await window.electronAPI.getMachineId();
+          if (id) {
+            setHwid(id);
+            setIsFetchingHwid(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error(`HWID load attempt ${attempts + 1} failed:`, e);
+      }
+      attempts++;
+      if (attempts < 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
-    setRecoveryStep('hwid');
+    
+    setHwidError(true);
+    setIsFetchingHwid(false);
+  };
+
+  const handleRecovery = async () => {
     setShowRecoveryModal(true);
+    setRecoveryStep('hwid');
+    await fetchHwidWithRetry();
   };
 
   const verifyRecoveryKey = () => {
@@ -3127,7 +3155,7 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
   useEffect(() => { setError(null); setPin(''); setUsername(''); setPassword(''); }, [selectedRole]);
 
   return (
-    <div className="absolute inset-0 bg-[var(--bg-deep)] flex flex-col items-center justify-center p-4 overflow-y-auto z-[300]" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="absolute inset-0 min-h-screen w-full bg-slate-100 dark:bg-[#0a0a0c] flex flex-col items-center justify-center p-4 overflow-y-auto z-[300]" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="absolute top-8 left-8 right-8 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#0066FF] flex items-center justify-center">🚀</div>
@@ -3139,7 +3167,7 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
         </button>
       </div>
 
-      <div className="w-full max-w-md bg-[var(--bg-sidebar)] border border-[var(--border-color)] p-10 space-y-10 shadow-none">
+      <div className="w-full max-w-md bg-white dark:bg-[#161618] border border-zinc-200 dark:border-[#D4AF37]/20 p-10 space-y-10 shadow-none">
         <div className="text-center">
           <h2 className={`text-4xl font-black text-[var(--text-primary)] mb-2 ${isRtl ? '' : 'tracking-tighter uppercase'}`}>{isRtl ? 'سجل دخولك' : 'Secure Login'}</h2>
           <p className={`text-[#D4AF37] font-black text-[10px] ${isRtl ? '' : 'uppercase tracking-widest'}`}>{isRtl ? 'بوابة التجار المحترفين' : 'Retail OS Bloomberg Edition'}</p>
@@ -3215,9 +3243,26 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
             {recoveryStep === 'hwid' && (
               <div className="space-y-4">
                 <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">{isRtl ? 'يرجى إرسال المعرف أدناه للمسؤول للحصول على كود إعادة التعيين.' : 'Provide the Hardware ID below to your administrator for a reset code.'}</p>
-                <div className="bg-[var(--bg-deep)] p-3 mb-1 font-mono text-[10px] text-teal-400 break-all select-all border border-[var(--border-color)]" style={{ userSelect: 'all' }}>
-                  {hwid || 'BROWSER-TEST-ID-2026'}
-                </div>
+                
+                {isFetchingHwid ? (
+                  <div className="bg-[var(--bg-deep)] p-4 mb-1 font-mono text-[10px] text-amber-500 text-center border border-rose-500/20 animate-pulse font-black uppercase tracking-wider">
+                    {isRtl ? 'جاري تحميل معرف الجهاز...' : 'Loading Machine ID (retrying)...'}
+                  </div>
+                ) : hwidError ? (
+                  <div className="space-y-2">
+                    <button 
+                      type="button"
+                      onClick={fetchHwidWithRetry}
+                      className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-widest transition-all">
+                      {isRtl ? 'إعادة المحاولة يدوياً' : 'Manual Retry'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-[var(--bg-deep)] p-3 mb-1 font-mono text-[10px] text-teal-400 break-all select-all border border-[var(--border-color)]" style={{ userSelect: 'all', cursor: 'pointer' }}>
+                    {hwid || 'BROWSER-TEST-ID-2026'}
+                  </div>
+                )}
+
                 <p className="text-[9px] text-rose-400 opacity-60 mb-4">{isRtl ? 'استخدم أداة المسؤول لتوليد الكود' : 'Use Admin Tool to generate current code'}</p>
                 
                 <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest block mb-2">{isRtl ? 'كود الاستعادة' : 'Recovery Key'}</label>
@@ -5517,9 +5562,15 @@ export default function App() {
     localStorage.removeItem('active_branch_name');
   };
 
-  const handleDummySubscribe = async () => {
+  const handleDummySubscribe = async (code) => {
+    if (!code) return false;
+    const regex = /^ACT-[A-Z0-9]{6}$/;
+    if (!regex.test(code)) {
+      return false;
+    }
+
     const targetBranchId = branchId || localStorage.getItem('active_branch_id');
-    if (!targetBranchId) return;
+    if (!targetBranchId) return false;
     const now = new Date();
     const subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     
@@ -5544,6 +5595,7 @@ export default function App() {
       }
     }
     pushNotification(isRtl ? '🎉 تم تفعيل الاشتراك بنجاح لمدة 30 يوماً!' : '🎉 Subscription activated successfully for 30 days!', 'success');
+    return true;
   };
 
   const handleManualSync = async () => {
@@ -5755,7 +5807,7 @@ export default function App() {
 
 
   return (
-    <div className="flex h-screen w-screen bg-white text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Offline Warning Banner */}
       {!isOnline && (
@@ -5791,7 +5843,9 @@ export default function App() {
             />
           )}
 
-          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200 relative">
+          <main className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative ${
+            !currentUser ? 'bg-slate-100 dark:bg-[#0a0a0c]' : 'bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20'
+          }`}>
             {!currentUser ? (
               <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
             ) : (
