@@ -69,9 +69,27 @@ CREATE TABLE IF NOT EXISTS store_settings (
   drawer_balance NUMERIC DEFAULT 0,
   main_safe_balance NUMERIC DEFAULT 0,
   bank_balance NUMERIC DEFAULT 0,
+  trial_start_date TIMESTAMPTZ DEFAULT now(),
+  subscription_status TEXT DEFAULT 'trial',
+  subscription_end_date TIMESTAMPTZ,
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(branch_id)
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='trial_start_date') THEN
+    ALTER TABLE store_settings ADD COLUMN trial_start_date TIMESTAMPTZ DEFAULT now();
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='subscription_status') THEN
+    ALTER TABLE store_settings ADD COLUMN subscription_status TEXT DEFAULT 'trial';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='store_settings' AND column_name='subscription_end_date') THEN
+    ALTER TABLE store_settings ADD COLUMN subscription_end_date TIMESTAMPTZ;
+  END IF;
+END $$;
 
 -- 3. USERS
 CREATE TABLE IF NOT EXISTS users (

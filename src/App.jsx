@@ -4,6 +4,7 @@ import * as SB from './supabaseService';
 import BranchManagement from './BranchManagement';
 import { fetchActiveBranches } from './branchService';
 import StockTransfersScreen from './StockTransfers';
+import SubscriptionUpgrade from './SubscriptionUpgrade';
 
 // Inject Google Fonts
 const styleEl = document.createElement('link');
@@ -4984,6 +4985,32 @@ const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shift
   return expected;
 };
 
+const checkSaaSStatus = (settings) => {
+  if (!settings) return { expired: false, daysLeft: null, status: 'trial' };
+  const status = settings.subscription_status || 'trial';
+  const trialStart = settings.trial_start_date ? new Date(settings.trial_start_date) : new Date();
+  const now = new Date();
+  
+  if (status === 'trial') {
+    const timeDiff = now - trialStart;
+    const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    if (daysDiff > 7) {
+      return { expired: true, daysLeft: 0, status: 'expired' };
+    } else {
+      const daysLeft = 7 - daysDiff;
+      return { expired: false, daysLeft: Math.max(0, daysLeft), status: 'trial' };
+    }
+  } else if (status === 'expired') {
+    return { expired: true, daysLeft: 0, status: 'expired' };
+  } else if (status === 'active') {
+    if (settings.subscription_end_date && new Date(settings.subscription_end_date) < now) {
+      return { expired: true, daysLeft: 0, status: 'expired' };
+    }
+    return { expired: false, daysLeft: null, status: 'active' };
+  }
+  return { expired: false, daysLeft: null, status: status };
+};
+
 export default function App() {
   const isOnline = useOnlineStatus();
   const [language, setLanguage] = useState('ar');
@@ -4994,6 +5021,10 @@ export default function App() {
   const [activeBranchName, setActiveBranchName] = useState(() => localStorage.getItem('active_branch_name') || '');
   const [cloudReady, setCloudReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
+  const [subStatus, setSubStatus] = useState(() => localStorage.getItem('pos_subscription_status') || 'trial');
 
   useEffect(() => {
     localStorage.setItem('pos_theme', theme);
@@ -5152,6 +5183,12 @@ export default function App() {
 
           // Settings
           if (cloudSettings) {
+            const saas = checkSaaSStatus(cloudSettings);
+            setSubStatus(saas.status);
+            setTrialDaysLeft(saas.daysLeft);
+            if (saas.expired) {
+              setSubscriptionExpired(true);
+            }
             if (cloudSettings.currency) setCurrency(cloudSettings.currency);
             if (cloudSettings.tax_rate != null) setTaxRate(Number(cloudSettings.tax_rate));
             if (cloudSettings.enable_service_fee != null) setEnableServiceFee(cloudSettings.enable_service_fee);
@@ -5166,9 +5203,10 @@ export default function App() {
             if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
             if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
           } else {
-            // First boot: seed cloud with local defaults
+            // First boot: seed cloud with local defaults and trial subscription
             await SB.saveSettings(branch.id, {
               currency, tax_rate: taxRate, store_name: storeName, language, theme,
+              subscription_status: 'trial', trial_start_date: new Date().toISOString()
             });
             for (const u of DEFAULT_USERS) await SB.saveUser(branch.id, u);
             for (const c of CATEGORIES) await SB.saveCategory(branch.id, c);
@@ -5182,14 +5220,18 @@ export default function App() {
         // Mark cloud as ready regardless — login flow can operate independently
         setCloudReady(true);
       } catch (err) {
-        console.error('❌ Cloud boot failed, using local cache. Details:', {
-          message: err.message,
-          stack: err.stack,
-          code: err.code,
-          details: err.details,
-          hint: err.hint,
-          status: err.status
+        console.error('❌ Cloud boot failed, using local cache. Details:', err);
+        const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+        const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+        const saas = checkSaaSStatus({
+          subscription_status: localStatus,
+          trial_start_date: localTrialStart,
+          subscription_end_date: localSubEnd
         });
+        setSubStatus(saas.status);
+        setTrialDaysLeft(saas.daysLeft);
+        if (saas.expired) setSubscriptionExpired(true);
         // Still mark as ready so login isn't blocked
         setCloudReady(true);
       }
@@ -5379,6 +5421,20 @@ export default function App() {
 
       // Step 2: If cloud returned a match, use it
       if (cloudUser) {
+        const targetBranchId = cloudUser.assignedBranchId || branchId;
+        if (targetBranchId) {
+          const settings = await SB.fetchSettings(targetBranchId);
+          if (settings) {
+            const saas = checkSaaSStatus(settings);
+            setSubStatus(saas.status);
+            setTrialDaysLeft(saas.daysLeft);
+            if (saas.expired) {
+              setSubscriptionExpired(true);
+            } else {
+              setSubscriptionExpired(false);
+            }
+          }
+        }
         setCurrentUser(cloudUser);
         // Bind session to user's assigned branch
         if (cloudUser.assignedBranchId && cloudUser.role !== 'Owner') {
@@ -5408,6 +5464,21 @@ export default function App() {
       }
       
       if (found && found.isActive) {
+        const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+        const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+        const saas = checkSaaSStatus({
+          subscription_status: localStatus,
+          trial_start_date: localTrialStart,
+          subscription_end_date: localSubEnd
+        });
+        setSubStatus(saas.status);
+        setTrialDaysLeft(saas.daysLeft);
+        if (saas.expired) {
+          setSubscriptionExpired(true);
+        } else {
+          setSubscriptionExpired(false);
+        }
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
         if (found.assignedBranchId && found.role !== 'Owner') {
@@ -5441,8 +5512,38 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setActiveBranchName('');
+    setSubscriptionExpired(false);
     localStorage.removeItem('active_branch_id');
     localStorage.removeItem('active_branch_name');
+  };
+
+  const handleDummySubscribe = async () => {
+    const targetBranchId = branchId || localStorage.getItem('active_branch_id');
+    if (!targetBranchId) return;
+    const now = new Date();
+    const subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Set state
+    setSubStatus('active');
+    setSubscriptionExpired(false);
+    setTrialDaysLeft(null);
+    
+    // Persist to local storage
+    localStorage.setItem('pos_subscription_status', 'active');
+    localStorage.setItem('pos_subscription_end_date', subscriptionEndDate);
+    
+    // Persist to Supabase if online
+    if (cloudReady) {
+      try {
+        await SB.saveSettings(targetBranchId, {
+          subscription_status: 'active',
+          subscription_end_date: subscriptionEndDate
+        });
+      } catch (err) {
+        console.error('Failed to sync payment status to cloud:', err);
+      }
+    }
+    pushNotification(isRtl ? '🎉 تم تفعيل الاشتراك بنجاح لمدة 30 يوماً!' : '🎉 Subscription activated successfully for 30 days!', 'success');
   };
 
   const handleManualSync = async () => {
@@ -5620,6 +5721,7 @@ export default function App() {
 
   const renderScreen = () => {
     if (!currentUser) return null;
+    if (subscriptionExpired) return null;
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
       case 'dashboard': return <Dashboard items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
@@ -5662,72 +5764,104 @@ export default function App() {
         </div>
       )}
 
-      {/* التعديل هنا: السايدبار هيظهر فقط لو فيه مستخدم */}
-      {currentUser && (
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={handleSetActiveTab}
-          onLogout={handleLogout}
-          user={currentUser}
-          language={language}
-          setLanguage={setLanguage}
-          userPermissions={userPermissions}
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-          activeBranchName={activeBranchName}
-        />
+      {/* Subscription Upgrade Guard */}
+      {currentUser && subscriptionExpired ? (
+        <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
+          <SubscriptionUpgrade
+            onSubscribe={handleDummySubscribe}
+            onLogout={handleLogout}
+            language={language}
+          />
+        </main>
+      ) : (
+        <>
+          {/* التعديل هنا: السايدبار هيظهر فقط لو فيه مستخدم */}
+          {currentUser && (
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={handleSetActiveTab}
+              onLogout={handleLogout}
+              user={currentUser}
+              language={language}
+              setLanguage={setLanguage}
+              userPermissions={userPermissions}
+              collapsed={collapsed}
+              setCollapsed={setCollapsed}
+              activeBranchName={activeBranchName}
+            />
+          )}
+
+          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200 relative">
+            {!currentUser ? (
+              <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-6 bg-[#0066FF]" />
+                    <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
+                      {T[language][activeTab] || activeTab}
+                    </h1>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {activeBranchName && (
+                      <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
+                        <span style={{ fontSize: 12 }}>🏢</span>
+                        <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
+                      </div>
+                    )}
+                    {branchId && (
+                      <button 
+                        onClick={handleManualSync}
+                        disabled={isSyncing}
+                        className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
+                        title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                      >
+                        <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                          <path d="M3 3v5h5" />
+                          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                          <path d="M16 21v-5h5" />
+                        </svg>
+                      </button>
+                    )}
+                    {activeShift && (
+                      <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
+                        <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
+                        <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
+                  {/* Trial Warning Banner */}
+                  {!subscriptionExpired && subStatus === 'trial' && trialDaysLeft !== null && (
+                    <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
+                      <div className="flex items-center gap-2">
+                        <span>💡</span>
+                        <span>
+                          {isRtl 
+                            ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
+                            : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setSubscriptionExpired(true)} 
+                        className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
+                      >
+                        {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
+                      </button>
+                    </div>
+                  )}
+                  {renderScreen()}
+                </div>
+              </>
+            )}
+          </main>
+        </>
       )}
-
-      <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200 relative">
-        {!currentUser ? (
-          <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
-        ) : (
-          <>
-            {/* Header */}
-            <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-[#0066FF]" />
-                <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
-                  {T[language][activeTab] || activeTab}
-                </h1>
-              </div>
-              <div className="flex items-center gap-4">
-                {activeBranchName && (
-                  <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
-                    <span style={{ fontSize: 12 }}>🏢</span>
-                    <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
-                  </div>
-                )}
-                {branchId && (
-                  <button 
-                    onClick={handleManualSync}
-                    disabled={isSyncing}
-                    className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
-                    title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
-                  >
-                    <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                      <path d="M3 3v5h5" />
-                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                      <path d="M16 21v-5h5" />
-                    </svg>
-                  </button>
-                )}
-                {activeShift && (
-                  <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
-                    <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
-                    <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
-              {renderScreen()}
-            </div>
-          </>
-        )}
-      </main>
 
       <NotificationOverlay
         notifications={notifications}
