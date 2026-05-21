@@ -863,7 +863,7 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
 // ============================================================
 // DASHBOARD
 // ============================================================
-function Dashboard({ items, orders, customers, expenses, purchases, customerPayments, cashboxLog, activeShift, users, language }) {
+function DashboardTab({ items, orders, customers, expenses, purchases, customerPayments, cashboxLog, activeShift, users, language }) {
   const t = T[language];
   const isRtl = language === 'ar';
 
@@ -3055,9 +3055,10 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
 }
 
 // ============================================================
-// LOGIN SCREEN
+// COMBINED AUTH SCREEN (SIGN IN / SIGN UP)
 // ============================================================
-function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
+function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, onUpdateUser }) {
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [selectedRole, setSelectedRole] = useState('Cashier');
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
@@ -3072,14 +3073,22 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
   const [newPassword, setNewPassword] = useState('');
   const isRtl = language === 'ar';
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [isFetchingHwid, setIsFetchingHwid] = useState(false);
   const [hwidError, setHwidError] = useState(false);
+
+  // Sign up fields
+  const [signUpStoreName, setSignUpStoreName] = useState('');
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpUsername, setSignUpUsername] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
 
   // Focus-activated keypad state
   const [isKeypadVisible, setIsKeypadVisible] = useState(false);
 
   const handlePin = async () => {
     setIsLoggingIn(true);
+    setError(null);
     const err = await onLogin(pin, undefined, 'Cashier');
     if (err) setError(err);
     setIsLoggingIn(false);
@@ -3087,9 +3096,22 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
 
   const handleCredentials = async () => {
     setIsLoggingIn(true);
+    setError(null);
     const err = await onLogin(username, password, selectedRole);
     if (err) setError(err);
     setIsLoggingIn(false);
+  };
+
+  const handleSignUpSubmit = async () => {
+    if (!signUpStoreName.trim() || !signUpName.trim() || !signUpUsername.trim() || !signUpPassword.trim()) {
+      setError(isRtl ? 'جميع الحقول مطلوبة' : 'All fields are required');
+      return;
+    }
+    setIsRegistering(true);
+    setError(null);
+    const err = await onSignUp(signUpName.trim(), signUpUsername.trim(), signUpPassword.trim(), signUpStoreName.trim());
+    if (err) setError(err);
+    setIsRegistering(false);
   };
 
   const fetchHwidWithRetry = async () => {
@@ -3162,7 +3184,17 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
     }
   };
 
-  useEffect(() => { setError(null); setPin(''); setUsername(''); setPassword(''); setIsKeypadVisible(false); }, [selectedRole]);
+  useEffect(() => {
+    setError(null);
+    setPin('');
+    setUsername('');
+    setPassword('');
+    setIsKeypadVisible(false);
+    setSignUpStoreName('');
+    setSignUpName('');
+    setSignUpUsername('');
+    setSignUpPassword('');
+  }, [selectedRole, authMode]);
 
   return (
     <div className="login-rounded min-h-screen w-full bg-slate-50 dark:bg-black flex flex-col md:grid md:grid-cols-2 overflow-x-hidden relative animate-[loginFadeIn_0.5s_ease-out] transition-all duration-500 ease-in-out" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -3245,29 +3277,11 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
               <span className="font-black tracking-widest text-lg uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
             </div>
             <h2 className={`text-3xl font-black text-[var(--text-primary)] tracking-tight ${isRtl ? '' : 'uppercase'}`}>
-              {isRtl ? 'سجل دخولك' : 'Secure Login'}
+              {authMode === 'login' ? (isRtl ? 'سجل دخولك' : 'Secure Login') : (isRtl ? 'بدء فترة تجريبية' : 'Start Trial')}
             </h2>
             <p className="text-[#D4AF37] font-black text-[10px] uppercase tracking-widest">
               {isRtl ? 'بوابة التجار المحترفين' : 'Retail OS Bloomberg Edition'}
             </p>
-          </div>
-
-          {/* Role Selector Tabs */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/70 p-1.5 rounded-2xl">
-            {['Cashier', 'Admin', 'Owner'].map(role => (
-              <button 
-                key={role} 
-                type="button"
-                onClick={() => setSelectedRole(role)}
-                className={`flex-1 py-3 font-black text-[11px] uppercase tracking-widest rounded-xl transition-all duration-300 ${
-                  selectedRole === role 
-                    ? 'bg-[#0066FF] text-white shadow-md' 
-                    : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-                }`}
-              >
-                {role}
-              </button>
-            ))}
           </div>
 
           {error && (
@@ -3276,67 +3290,151 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
             </div>
           )}
 
-          {selectedRole === 'Cashier' ? (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                  {isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={pin}
-                    onChange={handlePinChange}
-                    onFocus={() => setIsKeypadVisible(true)}
-                    onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
-                    placeholder="••••••"
-                    maxLength={6}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] text-center text-xl tracking-[0.5em] outline-none focus:border-[#0066FF] rounded-xl transition-all duration-300"
-                  />
-                </div>
+          {authMode === 'login' ? (
+            <div key="login" className="space-y-6 animate-[slideUpFade_0.25s_ease-out]">
+              {/* Role Selector Tabs */}
+              <div className="flex bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/70 p-1.5 rounded-2xl">
+                {['Cashier', 'Admin', 'Owner'].map(role => (
+                  <button 
+                    key={role} 
+                    type="button"
+                    onClick={() => setSelectedRole(role)}
+                    className={`flex-1 py-3 font-black text-[11px] uppercase tracking-widest rounded-xl transition-all duration-300 ${
+                      selectedRole === role 
+                        ? 'bg-[#0066FF] text-white shadow-md' 
+                        : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
               </div>
 
-              {/* Hidden Keypad: Appears only on focus with transition animation */}
-              {isKeypadVisible && (
-                <div className="grid grid-cols-3 gap-2.5 animate-[slideUpFade_0.25s_ease-out]">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
-                    <button
-                      key={btn}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()} // Prevents password field blur
-                      onClick={() => {
-                        if (btn === 'CLR') setPin('');
-                        else if (btn === '⌫') setPin(p => p.slice(0, -1));
-                        else if (pin.length < 6) setPin(p => p + String(btn));
-                      }}
-                      className="h-12 bg-zinc-100/80 hover:bg-zinc-200 dark:bg-zinc-800/40 dark:hover:bg-zinc-700/60 text-[var(--text-primary)] text-base font-black border border-zinc-200/50 dark:border-zinc-700/40 hover:border-[#0066FF] dark:hover:border-[#0066FF] hover:text-[#0066FF] dark:hover:text-[#0066FF] rounded-xl transition-all flex items-center justify-center"
-                    >
-                      {btn}
-                    </button>
-                  ))}
+              {selectedRole === 'Cashier' ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                      {isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={pin}
+                        onChange={handlePinChange}
+                        onFocus={() => setIsKeypadVisible(true)}
+                        onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
+                        placeholder="••••••"
+                        maxLength={6}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] text-center text-xl tracking-[0.5em] outline-none focus:border-[#0066FF] rounded-xl transition-all duration-300"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Hidden Keypad: Appears only on focus with transition animation */}
+                  {isKeypadVisible && (
+                    <div className="grid grid-cols-3 gap-2.5 animate-[slideUpFade_0.25s_ease-out]">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
+                        <button
+                          key={btn}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()} // Prevents password field blur
+                          onClick={() => {
+                            if (btn === 'CLR') setPin('');
+                            else if (btn === '⌫') setPin(p => p.slice(0, -1));
+                            else if (pin.length < 6) setPin(p => p + String(btn));
+                          }}
+                          className="h-12 bg-zinc-100/80 hover:bg-zinc-200 dark:bg-zinc-800/40 dark:hover:bg-zinc-700/60 text-[var(--text-primary)] text-base font-black border border-zinc-200/50 dark:border-zinc-700/40 hover:border-[#0066FF] dark:hover:border-[#0066FF] hover:text-[#0066FF] dark:hover:text-[#0066FF] rounded-xl transition-all flex items-center justify-center"
+                        >
+                          {btn}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button 
+                    type="button"
+                    onClick={handlePin} 
+                    disabled={pin.length < 4 || isLoggingIn}
+                    className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20"
+                  >
+                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                      {isRtl ? 'اسم المستخدم' : 'Username'}
+                    </label>
+                    <input 
+                      type="text" 
+                      value={username} 
+                      onChange={e => setUsername(e.target.value)}
+                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                      {isRtl ? 'كلمة المرور' : 'Password'}
+                    </label>
+                    <input 
+                      type="password" 
+                      value={password} 
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                    />
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleCredentials} 
+                    disabled={isLoggingIn}
+                    className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
+                  >
+                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
+                  </button>
                 </div>
               )}
 
-              <button 
-                type="button"
-                onClick={handlePin} 
-                disabled={pin.length < 4 || isLoggingIn}
-                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20"
-              >
-                {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
+              <button onClick={handleRecovery} className="w-full text-[9px] font-black text-[#D4AF37] uppercase tracking-[2px] opacity-60 hover:opacity-100 transition-all block mt-4">
+                {isRtl ? 'نسيت بيانات الدخول؟ (استعادة)' : 'Forgotten Credentials? (Recover)'}
               </button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div key="signup" className="space-y-6 animate-[slideUpFade_0.25s_ease-out]">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                  {isRtl ? 'اسم المتجر' : 'Store Name'}
+                </label>
+                <input 
+                  type="text" 
+                  value={signUpStoreName} 
+                  onChange={e => setSignUpStoreName(e.target.value)}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                  placeholder={isRtl ? 'اسم المتجر...' : 'Store Name...'}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
+                  {isRtl ? 'الاسم الكامل للمالك' : 'Owner Full Name'}
+                </label>
+                <input 
+                  type="text" 
+                  value={signUpName} 
+                  onChange={e => setSignUpName(e.target.value)}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                  placeholder={isRtl ? 'الاسم الكامل...' : 'Full Name...'}
+                />
+              </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
                   {isRtl ? 'اسم المستخدم' : 'Username'}
                 </label>
                 <input 
                   type="text" 
-                  value={username} 
-                  onChange={e => setUsername(e.target.value)}
+                  value={signUpUsername} 
+                  onChange={e => setSignUpUsername(e.target.value)}
                   className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                  placeholder={isRtl ? 'اسم المستخدم...' : 'Username...'}
                 />
               </div>
               <div className="space-y-2">
@@ -3345,25 +3443,38 @@ function LoginScreen({ onLogin, language, setLanguage, users, onUpdateUser }) {
                 </label>
                 <input 
                   type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)}
+                  value={signUpPassword} 
+                  onChange={e => setSignUpPassword(e.target.value)}
                   className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
+                  placeholder="••••••••"
                 />
               </div>
               <button 
                 type="button"
-                onClick={handleCredentials} 
-                disabled={isLoggingIn}
-                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
+                onClick={handleSignUpSubmit} 
+                disabled={isRegistering}
+                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
               >
-                {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
+                {isRegistering ? (isRtl ? 'جاري التسجيل...' : 'Registering...') : (isRtl ? 'بدء الفترة التجريبية (7 أيام)' : 'Start 7-Day Free Trial')}
               </button>
             </div>
           )}
 
-          <button onClick={handleRecovery} className="w-full text-[9px] font-black text-[#D4AF37] uppercase tracking-[2px] opacity-60 hover:opacity-100 transition-all block mt-4">
-            {isRtl ? 'نسيت بيانات الدخول؟ (استعادة)' : 'Forgotten Credentials? (Recover)'}
-          </button>
+          {/* Toggle Button for Auth Mode */}
+          <div className="flex flex-col items-center gap-3 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50">
+            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              {isRtl ? 'أو' : 'OR'}
+            </span>
+            <button 
+              type="button"
+              onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+              className="px-5 py-2.5 border border-zinc-300 dark:border-zinc-800 text-[var(--text-primary)] hover:text-[#0066FF] dark:hover:text-[#D4AF37] font-black uppercase text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-all w-full text-center"
+            >
+              {authMode === 'login' 
+                ? (isRtl ? 'إنشاء حساب تجريبي جديد' : 'Create New Trial Account') 
+                : (isRtl ? 'العودة لتسجيل الدخول' : 'Back to Login')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -5701,6 +5812,68 @@ export default function App() {
     }
   }, []);
 
+  const handleSignUp = async (name, username, password, signUpStoreName) => {
+    try {
+      const userId = 'USR-' + Date.now().toString(36).toUpperCase();
+      const newUser = {
+        id: userId,
+        name: name,
+        username: username,
+        password: password,
+        pin: password,
+        role: 'Owner',
+        isActive: true,
+        assignedBranchId: null,
+        assignedBranchName: null
+      };
+
+      const updatedUsers = [...users, newUser];
+      setUsers(updatedUsers);
+      localStorage.setItem('pos_users', JSON.stringify(updatedUsers));
+
+      const trialStart = new Date().toISOString();
+      localStorage.setItem('activationDate', trialStart);
+      localStorage.setItem('pos_trial_start_date', trialStart);
+      localStorage.setItem('pos_subscription_status', 'trial');
+
+      setSubscriptionStatus('trial');
+      setSubscriptionExpired(false);
+      setTrialDaysLeft(7);
+
+      setStoreName(signUpStoreName);
+      localStorage.setItem('storeName', signUpStoreName);
+
+      if (branchId && cloudReady) {
+        try {
+          await SB.saveUser(branchId, newUser);
+          await SB.saveSettings(branchId, {
+            store_name: signUpStoreName,
+            subscription_status: 'trial',
+            trial_start_date: trialStart
+          });
+        } catch (cloudErr) {
+          console.error('Cloud signup sync failed:', cloudErr);
+        }
+      }
+
+      setCurrentUser(newUser);
+
+      if (branchId) {
+        setActiveBranchName('Main Branch');
+        localStorage.setItem('active_branch_id', branchId);
+        localStorage.setItem('active_branch_name', 'Main Branch');
+      }
+
+      setActiveTab('dashboard');
+
+      pushNotification(isRtl ? 'تم إنشاء الحساب وبدء الفترة التجريبية' : 'Account created and trial started', 'success');
+      return null;
+    } catch (err) {
+      console.error('Signup error:', err);
+      return isRtl ? 'حدث خطأ أثناء إنشاء الحساب' : 'An error occurred during sign up';
+    }
+  };
+
   const handleLogin = async (id, pwd, role) => {
     try {
       // Step 1: Try Supabase cross-branch auth (cloud-first)
@@ -6050,7 +6223,7 @@ export default function App() {
     if (!currentUser) return null;
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
-      case 'dashboard': return <Dashboard items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
+      case 'dashboard': return <DashboardTab items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
       case 'pos': return <POSScreen currentUser={currentUser} items={saleableItems} customers={customers} categories={categories} onCompleteOrder={handleCompleteOrder} language={language} activeShift={activeShift} onAddCustomer={handleAddCustomer} onGoToShifts={() => handleSetActiveTab('shifts')} taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} currency={currency} storeName={storeName} setDrawerBalance={setDrawerBalance} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} users={users} />;
       case 'drawer': return <DrawerScreen activeShift={activeShift} drawerBalance={drawerBalance} setDrawerBalance={setDrawerBalance} setMainSafeBalance={setMainSafeBalance} drawerLogs={drawerLogs} setDrawerLogs={setDrawerLogs} currency={currency} isRtl={isRtl} setCashLog={setCashLog} currentUser={currentUser} />;
       case 'shifts': return <ShiftScreen activeShift={activeShift} shifts={shifts} onOpenShift={handleOpenShift} onCloseShift={handleCloseShift} currentUser={currentUser} language={language} users={users} orders={orders} expenses={expenses} onLogout={handleLogout} storeName={storeName} currency={currency} drawerLogs={drawerLogs} />;
@@ -6076,10 +6249,10 @@ export default function App() {
     }
   };
 
-  const renderScreen = () => {
+  const Dashboard = () => {
     return (
       <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
-
+        
         {/* Offline Warning Banner */}
         {!isOnline && (
           <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
@@ -6087,7 +6260,101 @@ export default function App() {
           </div>
         )}
 
-        {(subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={handleSetActiveTab}
+          onLogout={handleLogout}
+          user={currentUser}
+          language={language}
+          setLanguage={setLanguage}
+          userPermissions={userPermissions}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          activeBranchName={activeBranchName}
+        />
+
+        <main className="flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20">
+          {/* Header */}
+          <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-[#0066FF]" />
+              <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
+                {T[language][activeTab] || activeTab}
+              </h1>
+            </div>
+            <div className="flex items-center gap-4">
+              {activeBranchName && (
+                <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
+                  <span style={{ fontSize: 12 }}>🏢</span>
+                  <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
+                </div>
+              )}
+              {branchId && (
+                <button 
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
+                  title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                >
+                  <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 21v-5h5" />
+                  </svg>
+                </button>
+              )}
+              {activeShift && (
+                <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
+                  <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
+                  <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
+            {/* Trial Warning Banner */}
+            {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
+              <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
+                <div className="flex items-center gap-2">
+                  <span>💡</span>
+                  <span>
+                    {isRtl 
+                      ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
+                      : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => setSubscriptionExpired(true)} 
+                  className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
+                >
+                  {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
+                </button>
+              </div>
+            )}
+            {renderTabContent()}
+          </div>
+        </main>
+
+        <NotificationOverlay
+          notifications={notifications}
+          onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+        />
+      </div>
+    );
+  };
+
+  const AuthGateway = () => {
+    const isSubscriptionActive = !subscriptionExpired && (subscriptionStatus === 'active' || subscriptionStatus === 'trial');
+    if (!isSubscriptionActive) {
+      return (
+        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+          {!isOnline && (
+            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+            </div>
+          )}
           <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
             <SubscriptionUpgrade
               onSubscribe={handleDummySubscribe}
@@ -6096,98 +6363,33 @@ export default function App() {
               currentUser={currentUser}
             />
           </main>
-        ) : (
-          <>
-            {/* التعديل هنا: السايدبار هيظهر فقط لو فيه مستخدم */}
-            {currentUser && (
-              <Sidebar
-                activeTab={activeTab}
-                setActiveTab={handleSetActiveTab}
-                onLogout={handleLogout}
-                user={currentUser}
-                language={language}
-                setLanguage={setLanguage}
-                userPermissions={userPermissions}
-                collapsed={collapsed}
-                setCollapsed={setCollapsed}
-                activeBranchName={activeBranchName}
-              />
-            )}
+          <NotificationOverlay
+            notifications={notifications}
+            onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+          />
+        </div>
+      );
+    }
 
-            <main className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative ${
-              !currentUser ? 'bg-slate-100 dark:bg-[#0a0a0c]' : 'bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20'
-            }`}>
-              {!currentUser ? (
-                <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
-              ) : (
-                <>
-                  {/* Header */}
-                  <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
-                    <div className="flex items-center gap-3">
-                      <div className="w-1 h-6 bg-[#0066FF]" />
-                      <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
-                        {T[language][activeTab] || activeTab}
-                      </h1>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {activeBranchName && (
-                        <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
-                          <span style={{ fontSize: 12 }}>🏢</span>
-                          <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
-                        </div>
-                      )}
-                      {branchId && (
-                        <button 
-                          onClick={handleManualSync}
-                          disabled={isSyncing}
-                          className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
-                          title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
-                        >
-                          <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                            <path d="M3 3v5h5" />
-                            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                            <path d="M16 21v-5h5" />
-                          </svg>
-                        </button>
-                      )}
-                      {activeShift && (
-                        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
-                          <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
-                          <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+    if (currentUser) {
+      return <Dashboard />;
+    }
 
-                  <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
-                    {/* Trial Warning Banner */}
-                    {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
-                      <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
-                        <div className="flex items-center gap-2">
-                          <span>💡</span>
-                          <span>
-                            {isRtl 
-                              ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
-                              : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
-                          </span>
-                        </div>
-                        <button 
-                          onClick={() => setSubscriptionExpired(true)} 
-                          className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
-                        >
-                          {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
-                        </button>
-                      </div>
-                    )}
-                    {renderTabContent()}
-                  </div>
-                </>
-              )}
-            </main>
-          </>
+    return (
+      <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+        {!isOnline && (
+          <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+            ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+          </div>
         )}
-
+        <CombinedAuthScreen 
+          onLogin={handleLogin} 
+          onSignUp={handleSignUp}
+          language={language} 
+          setLanguage={setLanguage} 
+          users={users} 
+          onUpdateUser={handleUpdateUser} 
+        />
         <NotificationOverlay
           notifications={notifications}
           onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
@@ -6223,10 +6425,7 @@ export default function App() {
         </div>
       </>
     ) : (
-      <>
-        {console.log("Lifecycle: App rendered, Status:", isCheckingStatus)}
-        {renderScreen()}
-      </>
+      <AuthGateway />
     )
   );
 }
