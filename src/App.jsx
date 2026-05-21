@@ -6044,10 +6044,7 @@ export default function App() {
     setActiveTab(tab);
   };
 
-  const renderScreen = () => {
-    if (subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) {
-      return <SubscriptionUpgrade onSubscribe={handleDummySubscribe} onLogout={handleLogout} language={language} currentUser={currentUser} />;
-    }
+  const renderTabContent = () => {
     if (!currentUser) return null;
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
@@ -6077,145 +6074,151 @@ export default function App() {
     }
   };
 
+  const renderScreen = () => {
+    return (
+      <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+
+        {/* Offline Warning Banner */}
+        {!isOnline && (
+          <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+            ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+          </div>
+        )}
+
+        {(subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
+          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
+            <SubscriptionUpgrade
+              onSubscribe={handleDummySubscribe}
+              onLogout={handleLogout}
+              language={language}
+              currentUser={currentUser}
+            />
+          </main>
+        ) : (
+          <>
+            {/* التعديل هنا: السايدبار هيظهر فقط لو فيه مستخدم */}
+            {currentUser && (
+              <Sidebar
+                activeTab={activeTab}
+                setActiveTab={handleSetActiveTab}
+                onLogout={handleLogout}
+                user={currentUser}
+                language={language}
+                setLanguage={setLanguage}
+                userPermissions={userPermissions}
+                collapsed={collapsed}
+                setCollapsed={setCollapsed}
+                activeBranchName={activeBranchName}
+              />
+            )}
+
+            <main className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative ${
+              !currentUser ? 'bg-slate-100 dark:bg-[#0a0a0c]' : 'bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20'
+            }`}>
+              {!currentUser ? (
+                <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
+              ) : (
+                <>
+                  {/* Header */}
+                  <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1 h-6 bg-[#0066FF]" />
+                      <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
+                        {T[language][activeTab] || activeTab}
+                      </h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {activeBranchName && (
+                        <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
+                          <span style={{ fontSize: 12 }}>🏢</span>
+                          <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
+                        </div>
+                      )}
+                      {branchId && (
+                        <button 
+                          onClick={handleManualSync}
+                          disabled={isSyncing}
+                          className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
+                          title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                        >
+                          <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                            <path d="M3 3v5h5" />
+                            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                            <path d="M16 21v-5h5" />
+                          </svg>
+                        </button>
+                      )}
+                      {activeShift && (
+                        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
+                          <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
+                          <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
+                    {/* Trial Warning Banner */}
+                    {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
+                      <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
+                        <div className="flex items-center gap-2">
+                          <span>💡</span>
+                          <span>
+                            {isRtl 
+                              ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
+                              : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => setSubscriptionExpired(true)} 
+                          className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
+                        >
+                          {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
+                        </button>
+                      </div>
+                    )}
+                    {renderTabContent()}
+                  </div>
+                </>
+              )}
+            </main>
+          </>
+        )}
+
+        <NotificationOverlay
+          notifications={notifications}
+          onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+        />
+      </div>
+    );
+  };
+
   const t = T[language];
 
-
-
   return (
-    <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
-
-      {/* Offline Warning Banner */}
-      {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-          ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
-        </div>
-      )}
-
-      {isCheckingStatus ? (
-        <div className="login-rounded flex-1 flex flex-col items-center justify-center bg-[#0a0a0c]">
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
-              <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
-              <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
-                <span className="text-[10px]">⚡</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
-                {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
-              </h2>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
-                {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
-              </p>
+    isCheckingStatus ? (
+      <div className="login-rounded flex h-screen w-screen items-center justify-center bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
+            <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
+            <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
+              <span className="text-[10px]">⚡</span>
             </div>
           </div>
+          <div className="flex flex-col items-center gap-2">
+            <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+              {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
+            </h2>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
+              {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
+            </p>
+          </div>
         </div>
-      ) : (subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
-        <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
-          <SubscriptionUpgrade
-            onSubscribe={handleDummySubscribe}
-            onLogout={handleLogout}
-            language={language}
-            currentUser={currentUser}
-          />
-        </main>
-      ) : (
-        <>
-          {/* التعديل هنا: السايدبار هيظهر فقط لو فيه مستخدم */}
-          {currentUser && (
-            <Sidebar
-              activeTab={activeTab}
-              setActiveTab={handleSetActiveTab}
-              onLogout={handleLogout}
-              user={currentUser}
-              language={language}
-              setLanguage={setLanguage}
-              userPermissions={userPermissions}
-              collapsed={collapsed}
-              setCollapsed={setCollapsed}
-              activeBranchName={activeBranchName}
-            />
-          )}
-
-          <main className={`flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative ${
-            !currentUser ? 'bg-slate-100 dark:bg-[#0a0a0c]' : 'bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20'
-          }`}>
-            {!currentUser ? (
-              <LoginScreen onLogin={handleLogin} language={language} setLanguage={setLanguage} users={users} onUpdateUser={handleUpdateUser} />
-            ) : (
-              <>
-                {/* Header */}
-                <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-6 bg-[#0066FF]" />
-                    <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
-                      {T[language][activeTab] || activeTab}
-                    </h1>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {activeBranchName && (
-                      <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
-                        <span style={{ fontSize: 12 }}>🏢</span>
-                        <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
-                      </div>
-                    )}
-                    {branchId && (
-                      <button 
-                        onClick={handleManualSync}
-                        disabled={isSyncing}
-                        className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
-                        title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
-                      >
-                        <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                          <path d="M3 3v5h5" />
-                          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                          <path d="M16 21v-5h5" />
-                        </svg>
-                      </button>
-                    )}
-                    {activeShift && (
-                      <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
-                        <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
-                        <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
-                  {/* Trial Warning Banner */}
-                  {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
-                    <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
-                      <div className="flex items-center gap-2">
-                        <span>💡</span>
-                        <span>
-                          {isRtl 
-                            ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
-                            : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => setSubscriptionExpired(true)} 
-                        className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
-                      >
-                        {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
-                      </button>
-                    </div>
-                  )}
-                  {renderScreen()}
-                </div>
-              </>
-            )}
-          </main>
-        </>
-      )}
-
-      <NotificationOverlay
-        notifications={notifications}
-        onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
-      />
-    </div>
-  ); // هذا القوس يغلق الـ return
-} // هذا القوس ضروري جداً لإغلاق function App
+      </div>
+    ) : (
+      renderScreen()
+    )
+  );
+}
