@@ -5291,6 +5291,7 @@ export default function App() {
   const [subscriptionStatus, setSubscriptionStatus] = useState(getInitialSubscriptionStatus);
   const [subscriptionExpired, setSubscriptionExpired] = useState(() => getInitialSubscriptionStatus() === 'expired');
   const [trialDaysLeft, setTrialDaysLeft] = useState(getInitialTrialDaysLeft);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const subscriptionActive = !subscriptionExpired;
 
   useEffect(() => {
@@ -5304,6 +5305,9 @@ export default function App() {
     setSubscriptionStatus(status);
     setSubscriptionExpired(status === 'expired');
     setTrialDaysLeft(getInitialTrialDaysLeft());
+    if (status === 'expired') {
+      setIsCheckingStatus(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -5507,6 +5511,9 @@ export default function App() {
 
         // Mark cloud as ready regardless — login flow can operate independently
         setCloudReady(true);
+        if (!cancelled) {
+          setIsCheckingStatus(false);
+        }
       } catch (err) {
         console.error('❌ Cloud boot failed, using local cache. Details:', err);
         const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
@@ -5529,6 +5536,9 @@ export default function App() {
         }
         // Still mark as ready so login isn't blocked
         setCloudReady(true);
+        if (!cancelled) {
+          setIsCheckingStatus(false);
+        }
       }
     }
     bootFromCloud();
@@ -6081,7 +6091,27 @@ export default function App() {
         </div>
       )}
 
-      {(subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
+      {isCheckingStatus ? (
+        <div className="login-rounded flex-1 flex flex-col items-center justify-center bg-[#0a0a0c]">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
+              <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
+              <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
+                <span className="text-[10px]">⚡</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+                {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
+              </h2>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
+                {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
         <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
           <SubscriptionUpgrade
             onSubscribe={handleDummySubscribe}
