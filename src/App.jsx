@@ -5278,6 +5278,7 @@ const getInitialTrialDaysLeft = () => {
 };
 
 export default function App() {
+  console.log("Lifecycle: App mounted, Status Check Started");
   const isOnline = useOnlineStatus();
   const [language, setLanguage] = useState('ar');
   const isRtl = language === 'ar';
@@ -5291,7 +5292,11 @@ export default function App() {
   const [subscriptionStatus, setSubscriptionStatus] = useState(getInitialSubscriptionStatus);
   const [subscriptionExpired, setSubscriptionExpired] = useState(() => getInitialSubscriptionStatus() === 'expired');
   const [trialDaysLeft, setTrialDaysLeft] = useState(getInitialTrialDaysLeft);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(() => {
+    const status = localStorage.getItem('subscriptionStatus') || localStorage.getItem('pos_subscription_status');
+    // If status is not found or expired, we must hold the loader immediately
+    return true;
+  });
   const subscriptionActive = !subscriptionExpired;
 
   useEffect(() => {
@@ -5305,9 +5310,6 @@ export default function App() {
     setSubscriptionStatus(status);
     setSubscriptionExpired(status === 'expired');
     setTrialDaysLeft(getInitialTrialDaysLeft());
-    if (status === 'expired') {
-      setIsCheckingStatus(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -6198,27 +6200,33 @@ export default function App() {
 
   return (
     isCheckingStatus ? (
-      <div className="login-rounded flex h-screen w-screen items-center justify-center bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
-        <div className="flex flex-col items-center gap-6">
-          <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
-            <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
-            <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
-              <span className="text-[10px]">⚡</span>
+      <>
+        {console.log("Lifecycle: App rendered, Status:", isCheckingStatus)}
+        <div className="login-rounded flex h-screen w-screen items-center justify-center bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
+              <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
+              <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
+                <span className="text-[10px]">⚡</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+                {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
+              </h2>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
+                {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
+              </p>
             </div>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
-              {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
-            </h2>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
-              {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
-            </p>
-          </div>
         </div>
-      </div>
+      </>
     ) : (
-      renderScreen()
+      <>
+        {console.log("Lifecycle: App rendered, Status:", isCheckingStatus)}
+        {renderScreen()}
+      </>
     )
   );
 }
