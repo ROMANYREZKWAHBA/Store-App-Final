@@ -5176,10 +5176,14 @@ const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shift
 const checkSaaSStatus = (settings) => {
   if (!settings) return { expired: false, daysLeft: null, status: 'trial' };
   const status = settings.subscription_status || 'trial';
-  const trialStart = settings.trial_start_date ? new Date(settings.trial_start_date) : new Date();
+  const trialStartStr = settings.activationDate || settings.trial_start_date || new Date().toISOString();
+  const trialStart = new Date(trialStartStr);
   const now = new Date();
   
   if (status === 'trial') {
+    if (isNaN(trialStart.getTime())) {
+      return { expired: true, daysLeft: 0, status: 'expired' };
+    }
     const timeDiff = now - trialStart;
     const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
     if (daysDiff > 7) {
@@ -5199,6 +5203,80 @@ const checkSaaSStatus = (settings) => {
   return { expired: false, daysLeft: null, status: status };
 };
 
+const getInitialSubscriptionStatus = () => {
+  const localStatus = localStorage.getItem('pos_subscription_status');
+  
+  // Brand new install
+  if (!localStatus) {
+    const defaultDate = new Date().toISOString();
+    localStorage.setItem('pos_subscription_status', 'trial');
+    localStorage.setItem('activationDate', defaultDate);
+    localStorage.setItem('pos_trial_start_date', defaultDate);
+    return 'trial';
+  }
+
+  if (localStatus === 'active') {
+    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+    if (localSubEnd) {
+      const now = new Date();
+      if (new Date(localSubEnd) < now) {
+        localStorage.setItem('pos_subscription_status', 'expired');
+        return 'expired';
+      }
+    }
+    return 'active';
+  }
+
+  if (localStatus === 'trial') {
+    let activationDate = localStorage.getItem('activationDate');
+    
+    // Compatibility migration
+    if (!activationDate) {
+      const oldTrialStart = localStorage.getItem('pos_trial_start_date');
+      if (oldTrialStart && !isNaN(Date.parse(oldTrialStart))) {
+        activationDate = oldTrialStart;
+        localStorage.setItem('activationDate', activationDate);
+      }
+    }
+
+    // Security check: missing/invalid date defaults to expired
+    if (!activationDate || isNaN(Date.parse(activationDate))) {
+      localStorage.setItem('pos_subscription_status', 'expired');
+      return 'expired';
+    }
+
+    const now = new Date();
+    const trialStart = new Date(activationDate);
+    const timeDiff = now - trialStart;
+    const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+    if (daysDiff > 7) {
+      localStorage.setItem('pos_subscription_status', 'expired');
+      return 'expired';
+    }
+
+    return 'trial';
+  }
+
+  localStorage.setItem('pos_subscription_status', 'expired');
+  return 'expired';
+};
+
+const getInitialTrialDaysLeft = () => {
+  const localStatus = localStorage.getItem('pos_subscription_status');
+  if (localStatus === 'trial') {
+    const activationDate = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
+    if (activationDate && !isNaN(Date.parse(activationDate))) {
+      const now = new Date();
+      const trialStart = new Date(activationDate);
+      const timeDiff = now - trialStart;
+      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+      return Math.max(0, 7 - daysDiff);
+    }
+  }
+  return null;
+};
+
 export default function App() {
   const isOnline = useOnlineStatus();
   const [language, setLanguage] = useState('ar');
@@ -5210,19 +5288,9 @@ export default function App() {
   const [cloudReady, setCloudReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [subscriptionExpired, setSubscriptionExpired] = useState(() => {
-    const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-    const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
-    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
-    const saas = checkSaaSStatus({
-      subscription_status: localStatus,
-      trial_start_date: localTrialStart,
-      subscription_end_date: localSubEnd
-    });
-    return saas.expired;
-  });
-  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
-  const [subStatus, setSubStatus] = useState(() => localStorage.getItem('pos_subscription_status') || 'trial');
+  const [subscriptionStatus, setSubscriptionStatus] = useState(getInitialSubscriptionStatus);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(() => getInitialSubscriptionStatus() === 'expired');
+  const [trialDaysLeft, setTrialDaysLeft] = useState(getInitialTrialDaysLeft);
   const subscriptionActive = !subscriptionExpired;
 
   useEffect(() => {
@@ -5230,6 +5298,13 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  useEffect(() => {
+    const status = getInitialSubscriptionStatus();
+    setSubscriptionStatus(status);
+    setSubscriptionExpired(status === 'expired');
+    setTrialDaysLeft(getInitialTrialDaysLeft());
+  }, []);
 
   useEffect(() => {
     window.toggleTheme = () => {
@@ -5382,11 +5457,21 @@ export default function App() {
 
           // Settings
           if (cloudSettings) {
+            if (cloudSettings.subscription_status === 'trial') {
+              if (cloudSettings.trial_start_date) {
+                localStorage.setItem('activationDate', cloudSettings.trial_start_date);
+                localStorage.setItem('pos_trial_start_date', cloudSettings.trial_start_date);
+              }
+            }
             const saas = checkSaaSStatus(cloudSettings);
-            setSubStatus(saas.status);
+            setSubscriptionStatus(saas.status);
             setTrialDaysLeft(saas.daysLeft);
             if (saas.expired) {
               setSubscriptionExpired(true);
+              localStorage.setItem('pos_subscription_status', 'expired');
+            } else {
+              setSubscriptionExpired(false);
+              localStorage.setItem('pos_subscription_status', saas.status);
             }
             if (cloudSettings.currency) setCurrency(cloudSettings.currency);
             if (cloudSettings.tax_rate != null) setTaxRate(Number(cloudSettings.tax_rate));
@@ -5403,9 +5488,13 @@ export default function App() {
             if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
           } else {
             // First boot: seed cloud with local defaults and trial subscription
+            const trialStart = new Date().toISOString();
+            localStorage.setItem('activationDate', trialStart);
+            localStorage.setItem('pos_trial_start_date', trialStart);
+            localStorage.setItem('pos_subscription_status', 'trial');
             await SB.saveSettings(branch.id, {
               currency, tax_rate: taxRate, store_name: storeName, language, theme,
-              subscription_status: 'trial', trial_start_date: new Date().toISOString()
+              subscription_status: 'trial', trial_start_date: trialStart
             });
             for (const u of DEFAULT_USERS) await SB.saveUser(branch.id, u);
             for (const c of CATEGORIES) await SB.saveCategory(branch.id, c);
@@ -5421,16 +5510,23 @@ export default function App() {
       } catch (err) {
         console.error('❌ Cloud boot failed, using local cache. Details:', err);
         const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-        const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
         const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+        let isDateValid = localTrialStart && !isNaN(Date.parse(localTrialStart));
         const saas = checkSaaSStatus({
-          subscription_status: localStatus,
+          subscription_status: isDateValid ? localStatus : 'expired',
           trial_start_date: localTrialStart,
           subscription_end_date: localSubEnd
         });
-        setSubStatus(saas.status);
+        setSubscriptionStatus(saas.status);
         setTrialDaysLeft(saas.daysLeft);
-        if (saas.expired) setSubscriptionExpired(true);
+        if (saas.expired || !isDateValid) {
+          setSubscriptionExpired(true);
+          localStorage.setItem('pos_subscription_status', 'expired');
+        } else {
+          setSubscriptionExpired(false);
+          localStorage.setItem('pos_subscription_status', saas.status);
+        }
         // Still mark as ready so login isn't blocked
         setCloudReady(true);
       }
@@ -5624,13 +5720,21 @@ export default function App() {
         if (targetBranchId) {
           const settings = await SB.fetchSettings(targetBranchId);
           if (settings) {
+            if (settings.subscription_status === 'trial') {
+              if (settings.trial_start_date) {
+                localStorage.setItem('activationDate', settings.trial_start_date);
+                localStorage.setItem('pos_trial_start_date', settings.trial_start_date);
+              }
+            }
             const saas = checkSaaSStatus(settings);
-            setSubStatus(saas.status);
+            setSubscriptionStatus(saas.status);
             setTrialDaysLeft(saas.daysLeft);
             if (saas.expired) {
               setSubscriptionExpired(true);
+              localStorage.setItem('pos_subscription_status', 'expired');
             } else {
               setSubscriptionExpired(false);
+              localStorage.setItem('pos_subscription_status', saas.status);
             }
           }
         }
@@ -5664,19 +5768,22 @@ export default function App() {
       
       if (found && found.isActive) {
         const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-        const localTrialStart = localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
         const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+        let isDateValid = localTrialStart && !isNaN(Date.parse(localTrialStart));
         const saas = checkSaaSStatus({
-          subscription_status: localStatus,
+          subscription_status: isDateValid ? localStatus : 'expired',
           trial_start_date: localTrialStart,
           subscription_end_date: localSubEnd
         });
-        setSubStatus(saas.status);
+        setSubscriptionStatus(saas.status);
         setTrialDaysLeft(saas.daysLeft);
-        if (saas.expired) {
+        if (saas.expired || !isDateValid) {
           setSubscriptionExpired(true);
+          localStorage.setItem('pos_subscription_status', 'expired');
         } else {
           setSubscriptionExpired(false);
+          localStorage.setItem('pos_subscription_status', saas.status);
         }
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
@@ -5710,8 +5817,10 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setBranchId(null);
     setActiveBranchName('');
     setSubscriptionExpired(false);
+    setSubscriptionStatus('expired');
     localStorage.removeItem('active_branch_id');
     localStorage.removeItem('active_branch_name');
   };
@@ -5729,7 +5838,7 @@ export default function App() {
     const subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     
     // Set state
-    setSubStatus('active');
+    setSubscriptionStatus('active');
     setSubscriptionExpired(false);
     setTrialDaysLeft(null);
     
@@ -5926,7 +6035,9 @@ export default function App() {
   };
 
   const renderScreen = () => {
-    if (!subscriptionActive) return <SubscriptionUpgrade onSubscribe={handleDummySubscribe} onLogout={handleLogout} language={language} currentUser={currentUser} />;
+    if (subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) {
+      return <SubscriptionUpgrade onSubscribe={handleDummySubscribe} onLogout={handleLogout} language={language} currentUser={currentUser} />;
+    }
     if (!currentUser) return null;
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
@@ -5970,7 +6081,7 @@ export default function App() {
         </div>
       )}
 
-      {!subscriptionActive ? (
+      {(subscriptionStatus === 'expired' || subscriptionExpired || (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial')) ? (
         <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
           <SubscriptionUpgrade
             onSubscribe={handleDummySubscribe}
@@ -6045,7 +6156,7 @@ export default function App() {
 
                 <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
                   {/* Trial Warning Banner */}
-                  {!subscriptionExpired && subStatus === 'trial' && trialDaysLeft !== null && (
+                  {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
                     <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
                       <div className="flex items-center gap-2">
                         <span>💡</span>

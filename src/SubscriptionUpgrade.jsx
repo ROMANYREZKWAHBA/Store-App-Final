@@ -19,6 +19,14 @@ export default function SubscriptionUpgrade({ onSubscribe, onLogout, language, c
     }
   };
   
+  const handleLogout = () => {
+    localStorage.clear();
+    if (onLogout) {
+      onLogout();
+    }
+    window.location.reload();
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 p-6 transition-colors duration-200">
       <div className="w-full max-w-md border border-zinc-200 dark:border-[#D4AF37]/20 bg-slate-50 dark:bg-[#151518] p-8 shadow-2xl space-y-8 text-center animate-[fadeIn_0.3s_ease]">
@@ -35,6 +43,13 @@ export default function SubscriptionUpgrade({ onSubscribe, onLogout, language, c
               : 'Your store\'s trial period or subscription has expired. Please enter your activation code to continue.'}
           </p>
         </div>
+
+        {localStorage.getItem('pos_subscription_status') === 'expired' && (
+          <div className="relative overflow-hidden bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 dark:border-rose-500/30 p-4 text-xs font-black tracking-widest uppercase text-rose-500 dark:text-rose-400 text-center animate-[fadeIn_0.5s_ease] flex flex-col items-center justify-center gap-1">
+            <span className="text-lg">⚠️</span>
+            <span>{isRtl ? 'لقد انتهت الفترة التجريبية المجانية الخاصة بك (7 أيام).' : 'Your free trial period (7 days) has concluded.'}</span>
+          </div>
+        )}
 
         <div className="border-t border-b border-zinc-200 dark:border-[#D4AF37]/10 py-6 my-2 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
@@ -83,14 +98,12 @@ export default function SubscriptionUpgrade({ onSubscribe, onLogout, language, c
           </a>
         </div>
 
-        {currentUser && (
-          <button
-            onClick={onLogout}
-            className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-2 block mx-auto font-bold"
-          >
-            {isRtl ? '✕ تسجيل الخروج' : '✕ Logout'}
-          </button>
-        )}
+        <button
+          onClick={handleLogout}
+          className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-2 block mx-auto font-bold"
+        >
+          {isRtl ? '✕ تسجيل الخروج' : '✕ Logout'}
+        </button>
       </div>
     </div>
   );
