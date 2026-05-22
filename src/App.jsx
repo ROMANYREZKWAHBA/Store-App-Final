@@ -5,6 +5,8 @@ import BranchManagement from './BranchManagement';
 import { fetchActiveBranches } from './branchService';
 import StockTransfersScreen from './StockTransfers';
 import SubscriptionUpgrade from './SubscriptionUpgrade';
+import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
+import AdminMasterPanel from './AdminMasterPanel';
 
 // Inject Google Fonts
 const styleEl = document.createElement('link');
@@ -240,7 +242,7 @@ const INITIAL_ITEMS = [
 const DEFAULT_USERS = [
   { id: 'u_1', name: 'Cashier Account', pin: '1234', role: 'Cashier', isActive: true },
   { id: 'u_3', name: 'Admin Manager', username: 'admin', password: 'admin', pin: '0000', role: 'Admin', isActive: true },
-  { id: 'u_4', name: 'System Owner', username: 'owner', password: 'owner', pin: '9999', role: 'Owner', isActive: true, recoveryCode: 'BREW-MASTER-9999-RECOVERY' },
+  { id: 'u_4', name: 'System Owner', username: 'owner', password: 'owner', pin: '9999', role: 'admin', isActive: true, recoveryCode: 'BREW-MASTER-9999-RECOVERY' },
 ];
 
 const T = {
@@ -270,6 +272,7 @@ const T = {
 
 const ROLE_PERMISSIONS = {
   Owner: ['all'],
+  admin: ['all'],
   Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
   Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
   Cashier: ['pos', 'shifts', 'sales'],
@@ -279,7 +282,10 @@ const ROLE_PERMISSIONS = {
 
 const canAccess = (user, tab, customPerms) => {
   if (!user) return false;
-  if (user.role === 'Owner') return true;
+  if (tab === 'admin_panel') {
+    return user.role === 'admin';
+  }
+  if (user.role === 'Owner' || user.role === 'admin') return true;
   // If owner set custom permissions for this user, use those
   if (customPerms && customPerms[user.id]) {
     return customPerms[user.id].includes(tab);
@@ -2507,7 +2513,7 @@ function DrawerScreen({ activeShift, drawerBalance, setDrawerBalance, setMainSaf
 // ============================================================
 function SettingsScreen({ currentUser, users, language, setLanguage, theme, setTheme, onUpdateUser, userPermissions, setUserPermissions, storeName, setStoreName, currency, setCurrency, taxRate, setTaxRate, enableServiceFee, setEnableServiceFee, serviceFee, setServiceFee, pushNotification, invoiceLogo, setInvoiceLogo, invoiceHeader, setInvoiceHeader, invoiceFooter, setInvoiceFooter }) {
   const isRtl = language === 'ar';
-  const isOwner = currentUser.role === 'Owner';
+  const isOwner = currentUser.role === 'Owner' || currentUser.role === 'admin';
   const [section, setSection] = useState('profile');
 
   const handleExportBackup = () => {
@@ -2620,6 +2626,7 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
     { id: 'drawer', label: isRtl ? 'درج الكاشير' : 'Cash Drawer', icon: '💵' },
     { id: 'reports', label: isRtl ? 'التقارير' : 'Reports', icon: '📈' },
     { id: 'settings', label: isRtl ? 'الإعدادات' : 'Settings', icon: '⚙️' },
+    { id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' },
   ];
 
   const editableUsers = users.filter(u => u.id !== currentUser.id && u.role !== 'Owner');
@@ -3613,6 +3620,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'reports', label: t.reports, icon: '📈' },
         { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
+        ...(user?.role === 'admin' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' }] : []),
       ]
     },
   ];
@@ -3769,6 +3777,33 @@ function NotificationOverlay({ notifications, onDismiss }) {
           <p className="text-xs">{n.message}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ============================================================
+// SUBSCRIPTION WARNING BANNER
+// ============================================================
+function SubscriptionWarningBanner({ daysLeft, onRenew, language }) {
+  if (daysLeft === null || daysLeft === undefined || daysLeft > 3 || daysLeft <= 0) return null;
+  const isRtl = language === 'ar';
+
+  return (
+    <div className="bg-[#fbbf24] text-black text-center py-2.5 px-6 text-xs font-black uppercase tracking-widest flex items-center justify-between border-b border-yellow-600/30 shrink-0 z-[100] animate-pulse">
+      <div className="flex items-center gap-2 mx-auto">
+        <span>⚠️</span>
+        <span className="font-extrabold">
+          {isRtl 
+            ? `ينتهي تجريبك في خلال ${daysLeft} أيام. جدد الآن!`
+            : `Your trial expires in ${daysLeft} days. Renew now!`}
+        </span>
+      </div>
+      <button 
+        onClick={onRenew}
+        className="bg-black text-[#fbbf24] hover:bg-zinc-900 hover:text-white px-4 py-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-black/20"
+      >
+        {isRtl ? 'تجديد' : 'Renew'}
+      </button>
     </div>
   );
 }
@@ -5284,34 +5319,56 @@ const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shift
   return expected;
 };
 
-const checkSaaSStatus = (settings) => {
-  if (!settings) return { expired: false, daysLeft: null, status: 'trial' };
-  const status = settings.subscription_status || 'trial';
-  const trialStartStr = settings.activationDate || settings.trial_start_date || new Date().toISOString();
-  const trialStart = new Date(trialStartStr);
+const checkSubscriptionStatus = (statusOrSettings, activationDateStr, expiryDateStr) => {
+  let status;
+  let actDate;
+  let expDate;
+
+  if (statusOrSettings && typeof statusOrSettings === 'object') {
+    status = statusOrSettings.subscription_status || 'trial';
+    actDate = statusOrSettings.activationDate || statusOrSettings.trial_start_date;
+    expDate = statusOrSettings.subscription_end_date;
+  } else {
+    status = statusOrSettings || 'trial';
+    actDate = activationDateStr;
+    expDate = expiryDateStr;
+  }
+
   const now = new Date();
   
-  if (status === 'trial') {
-    if (isNaN(trialStart.getTime())) {
-      return { expired: true, daysLeft: 0, status: 'expired' };
-    }
-    const timeDiff = now - trialStart;
-    const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-    if (daysDiff > 7) {
-      return { expired: true, daysLeft: 0, status: 'expired' };
-    } else {
-      const daysLeft = 7 - daysDiff;
-      return { expired: false, daysLeft: Math.max(0, daysLeft), status: 'trial' };
-    }
-  } else if (status === 'expired') {
-    return { expired: true, daysLeft: 0, status: 'expired' };
-  } else if (status === 'active') {
-    if (settings.subscription_end_date && new Date(settings.subscription_end_date) < now) {
-      return { expired: true, daysLeft: 0, status: 'expired' };
-    }
-    return { expired: false, daysLeft: null, status: 'active' };
+  if (status === 'pending_onboarding') {
+    return { status: 'pending_onboarding', daysLeft: null, expired: false };
   }
-  return { expired: false, daysLeft: null, status: status };
+  if (status === 'expired') {
+    return { status: 'expired', daysLeft: 0, expired: true };
+  }
+
+  let expiryDate = null;
+  if (status === 'trial') {
+    const trialStartStr = actDate || new Date().toISOString();
+    const trialStart = new Date(trialStartStr);
+    if (isNaN(trialStart.getTime())) {
+      return { status: 'expired', daysLeft: 0, expired: true };
+    }
+    expiryDate = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  } else if (status === 'active') {
+    if (expDate) {
+      expiryDate = new Date(expDate);
+    }
+  }
+
+  if (!expiryDate || isNaN(expiryDate.getTime())) {
+    return { status: 'expired', daysLeft: 0, expired: true };
+  }
+
+  const timeDiff = expiryDate.getTime() - now.getTime();
+  const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+  if (daysLeft <= 0) {
+    return { status: 'expired', daysLeft: 0, expired: true };
+  }
+
+  return { status, daysLeft, expired: false };
 };
 
 const getInitialSubscriptionStatus = () => {
@@ -5326,66 +5383,24 @@ const getInitialSubscriptionStatus = () => {
     return 'trial';
   }
 
-  if (localStatus === 'active') {
-    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
-    if (localSubEnd) {
-      const now = new Date();
-      if (new Date(localSubEnd) < now) {
-        localStorage.setItem('pos_subscription_status', 'expired');
-        return 'expired';
-      }
-    }
-    return 'active';
+  const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
+  const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+
+  const result = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
+  if (result.expired) {
+    localStorage.setItem('pos_subscription_status', 'expired');
+    return 'expired';
   }
-
-  if (localStatus === 'trial') {
-    let activationDate = localStorage.getItem('activationDate');
-    
-    // Compatibility migration
-    if (!activationDate) {
-      const oldTrialStart = localStorage.getItem('pos_trial_start_date');
-      if (oldTrialStart && !isNaN(Date.parse(oldTrialStart))) {
-        activationDate = oldTrialStart;
-        localStorage.setItem('activationDate', activationDate);
-      }
-    }
-
-    // Security check: missing/invalid date defaults to expired
-    if (!activationDate || isNaN(Date.parse(activationDate))) {
-      localStorage.setItem('pos_subscription_status', 'expired');
-      return 'expired';
-    }
-
-    const now = new Date();
-    const trialStart = new Date(activationDate);
-    const timeDiff = now - trialStart;
-    const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-    if (daysDiff > 7) {
-      localStorage.setItem('pos_subscription_status', 'expired');
-      return 'expired';
-    }
-
-    return 'trial';
-  }
-
-  localStorage.setItem('pos_subscription_status', 'expired');
-  return 'expired';
+  return result.status;
 };
 
 const getInitialTrialDaysLeft = () => {
-  const localStatus = localStorage.getItem('pos_subscription_status');
-  if (localStatus === 'trial') {
-    const activationDate = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
-    if (activationDate && !isNaN(Date.parse(activationDate))) {
-      const now = new Date();
-      const trialStart = new Date(activationDate);
-      const timeDiff = now - trialStart;
-      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-      return Math.max(0, 7 - daysDiff);
-    }
-  }
-  return null;
+  const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+  const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
+  const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+  
+  const result = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
+  return result.status === 'trial' ? result.daysLeft : null;
 };
 
 export default function App() {
@@ -5580,9 +5595,9 @@ export default function App() {
                 localStorage.setItem('pos_trial_start_date', cloudSettings.trial_start_date);
               }
             }
-            const saas = checkSaaSStatus(cloudSettings);
+            const saas = checkSubscriptionStatus(cloudSettings);
             setSubscriptionStatus(saas.status);
-            setTrialDaysLeft(saas.daysLeft);
+            setTrialDaysLeft(saas.status === 'trial' ? saas.daysLeft : null);
             if (saas.expired) {
               setSubscriptionExpired(true);
               localStorage.setItem('pos_subscription_status', 'expired');
@@ -5630,17 +5645,12 @@ export default function App() {
       } catch (err) {
         console.error('❌ Cloud boot failed, using local cache. Details:', err);
         const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
         const localSubEnd = localStorage.getItem('pos_subscription_end_date');
-        let isDateValid = localTrialStart && !isNaN(Date.parse(localTrialStart));
-        const saas = checkSaaSStatus({
-          subscription_status: isDateValid ? localStatus : 'expired',
-          trial_start_date: localTrialStart,
-          subscription_end_date: localSubEnd
-        });
+        const saas = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
         setSubscriptionStatus(saas.status);
-        setTrialDaysLeft(saas.daysLeft);
-        if (saas.expired || !isDateValid) {
+        setTrialDaysLeft(saas.status === 'trial' ? saas.daysLeft : null);
+        if (saas.expired) {
           setSubscriptionExpired(true);
           localStorage.setItem('pos_subscription_status', 'expired');
         } else {
@@ -5821,7 +5831,7 @@ export default function App() {
         username: username,
         password: password,
         pin: password,
-        role: 'Owner',
+        role: 'admin',
         isActive: true,
         assignedBranchId: null,
         assignedBranchName: null
@@ -5831,14 +5841,14 @@ export default function App() {
       setUsers(updatedUsers);
       localStorage.setItem('pos_users', JSON.stringify(updatedUsers));
 
-      const trialStart = new Date().toISOString();
-      localStorage.setItem('activationDate', trialStart);
-      localStorage.setItem('pos_trial_start_date', trialStart);
-      localStorage.setItem('pos_subscription_status', 'trial');
+      localStorage.setItem('pos_subscription_status', 'pending_onboarding');
+      localStorage.removeItem('activationDate');
+      localStorage.removeItem('pos_trial_start_date');
+      localStorage.removeItem('pos_subscription_end_date');
 
-      setSubscriptionStatus('trial');
+      setSubscriptionStatus('pending_onboarding');
       setSubscriptionExpired(false);
-      setTrialDaysLeft(7);
+      setTrialDaysLeft(null);
 
       setStoreName(signUpStoreName);
       localStorage.setItem('storeName', signUpStoreName);
@@ -5848,8 +5858,7 @@ export default function App() {
           await SB.saveUser(branchId, newUser);
           await SB.saveSettings(branchId, {
             store_name: signUpStoreName,
-            subscription_status: 'trial',
-            trial_start_date: trialStart
+            subscription_status: 'pending_onboarding'
           });
         } catch (cloudErr) {
           console.error('Cloud signup sync failed:', cloudErr);
@@ -5866,11 +5875,74 @@ export default function App() {
 
       setActiveTab('dashboard');
 
-      pushNotification(isRtl ? 'تم إنشاء الحساب وبدء الفترة التجريبية' : 'Account created and trial started', 'success');
+      pushNotification(isRtl ? 'تم إنشاء الحساب بنجاح، يرجى اختيار خطة الاشتراك للمتابعة' : 'Account created successfully. Please select a plan to continue.', 'success');
       return null;
     } catch (err) {
       console.error('Signup error:', err);
       return isRtl ? 'حدث خطأ أثناء إنشاء الحساب' : 'An error occurred during sign up';
+    }
+  };
+
+  const handleSelectSubscriptionPlan = async (planType) => {
+    try {
+      const now = new Date();
+      let status = 'trial';
+      let expiry = null;
+      let trialDays = null;
+      
+      if (planType === 'trial') {
+        status = 'trial';
+        expiry = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        trialDays = 7;
+        
+        localStorage.setItem('activationDate', now.toISOString());
+        localStorage.setItem('pos_trial_start_date', now.toISOString());
+        localStorage.setItem('pos_subscription_status', 'trial');
+        localStorage.removeItem('pos_subscription_end_date');
+      } else if (planType === 'monthly') {
+        status = 'active';
+        expiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        localStorage.setItem('pos_subscription_status', 'active');
+        localStorage.setItem('pos_subscription_end_date', expiry);
+        localStorage.removeItem('activationDate');
+        localStorage.removeItem('pos_trial_start_date');
+      } else if (planType === 'yearly') {
+        status = 'active';
+        expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+        
+        localStorage.setItem('pos_subscription_status', 'active');
+        localStorage.setItem('pos_subscription_end_date', expiry);
+        localStorage.removeItem('activationDate');
+        localStorage.removeItem('pos_trial_start_date');
+      }
+      
+      setSubscriptionStatus(status);
+      setSubscriptionExpired(false);
+      setTrialDaysLeft(trialDays);
+      
+      // Save settings to cloud if online
+      const targetBranchId = branchId || localStorage.getItem('active_branch_id');
+      if (targetBranchId && cloudReady) {
+        try {
+          await SB.saveSettings(targetBranchId, {
+            subscription_status: status,
+            trial_start_date: status === 'trial' ? now.toISOString() : undefined,
+            subscription_end_date: status === 'active' ? expiry : undefined
+          });
+        } catch (cloudErr) {
+          console.error('Failed to sync payment status to cloud:', cloudErr);
+        }
+      }
+      
+      pushNotification(
+        isRtl 
+          ? `🎉 تم تفعيل خطة الاشتراك (${planType === 'trial' ? 'فترة تجريبية' : planType === 'monthly' ? 'شهري' : 'سنوي'}) بنجاح!` 
+          : `🎉 Subscription plan (${planType.toUpperCase()}) activated successfully!`, 
+        'success'
+      );
+    } catch (err) {
+      console.error('Subscription selection error:', err);
     }
   };
 
@@ -5911,9 +5983,9 @@ export default function App() {
                 localStorage.setItem('pos_trial_start_date', settings.trial_start_date);
               }
             }
-            const saas = checkSaaSStatus(settings);
+            const saas = checkSubscriptionStatus(settings);
             setSubscriptionStatus(saas.status);
-            setTrialDaysLeft(saas.daysLeft);
+            setTrialDaysLeft(saas.status === 'trial' ? saas.daysLeft : null);
             if (saas.expired) {
               setSubscriptionExpired(true);
               localStorage.setItem('pos_subscription_status', 'expired');
@@ -5953,17 +6025,12 @@ export default function App() {
       
       if (found && found.isActive) {
         const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date') || new Date().toISOString();
+        const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
         const localSubEnd = localStorage.getItem('pos_subscription_end_date');
-        let isDateValid = localTrialStart && !isNaN(Date.parse(localTrialStart));
-        const saas = checkSaaSStatus({
-          subscription_status: isDateValid ? localStatus : 'expired',
-          trial_start_date: localTrialStart,
-          subscription_end_date: localSubEnd
-        });
+        const saas = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
         setSubscriptionStatus(saas.status);
-        setTrialDaysLeft(saas.daysLeft);
-        if (saas.expired || !isDateValid) {
+        setTrialDaysLeft(saas.status === 'trial' ? saas.daysLeft : null);
+        if (saas.expired) {
           setSubscriptionExpired(true);
           localStorage.setItem('pos_subscription_status', 'expired');
         } else {
@@ -6237,7 +6304,7 @@ export default function App() {
       case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
-      case 'branches': return currentUser.role === 'Owner'
+      case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
         ? <BranchManagement language={language} />
         : <div className="flex flex-col items-center justify-center h-full gap-6 p-10">
             <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center"><span className="text-4xl">🔒</span></div>
@@ -6245,11 +6312,50 @@ export default function App() {
             <p className="text-[#666] text-xs font-bold uppercase tracking-widest text-center max-w-md">{isRtl ? 'هذه الصفحة متاحة فقط لحساب المالك. تواصل مع مدير النظام.' : 'This page is restricted to the System Owner. Contact your administrator.'}</p>
             <button onClick={() => handleSetActiveTab('dashboard')} className="px-6 py-3 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition-all">{isRtl ? 'العودة للرئيسية' : 'Back to Dashboard'}</button>
           </div>;
+      case 'admin_panel':
+        if (currentUser.role !== 'admin') {
+          return (
+            <div className="flex flex-col items-center justify-center h-full gap-6 p-10">
+              <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center"><span className="text-4xl">🔒</span></div>
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">{isRtl ? 'غير مصرح' : 'Unauthorized'}</h2>
+              <p className="text-[#666] text-xs font-bold uppercase tracking-widest text-center max-w-md">{isRtl ? 'هذه الصفحة متاحة فقط لمسؤولي النظام.' : 'This page is restricted to system administrators.'}</p>
+              <button onClick={() => handleSetActiveTab('dashboard')} className="px-6 py-3 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition-all">{isRtl ? 'العودة للرئيسية' : 'Back to Dashboard'}</button>
+            </div>
+          );
+        }
+        return (
+          <AdminMasterPanel
+            users={users}
+            setUsers={setUsers}
+            currentUser={currentUser}
+            language={language}
+            subscriptionStatus={subscriptionStatus}
+            setSubscriptionStatus={setSubscriptionStatus}
+            setSubscriptionExpired={setSubscriptionExpired}
+            setTrialDaysLeft={setTrialDaysLeft}
+            storeName={storeName}
+            pushNotification={pushNotification}
+          />
+        );
       default: return <PlaceholderScreen title={activeTab} icon="🔧" language={language} />;
     }
   };
 
   const Dashboard = () => {
+    const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+    const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
+    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+    const saas = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
+    const daysLeft = saas.daysLeft;
+
+    useEffect(() => {
+      if (daysLeft !== null && daysLeft <= 0) {
+        localStorage.setItem('pos_subscription_status', 'expired');
+        setSubscriptionStatus('expired');
+        setSubscriptionExpired(true);
+      }
+    }, [daysLeft]);
+
     return (
       <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
         
@@ -6274,6 +6380,15 @@ export default function App() {
         />
 
         <main className="flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20">
+          <SubscriptionWarningBanner
+            daysLeft={daysLeft}
+            onRenew={() => {
+              localStorage.setItem('pos_subscription_status', 'pending_onboarding');
+              setSubscriptionStatus('pending_onboarding');
+            }}
+            language={language}
+          />
+          
           {/* Header */}
           <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
             <div className="flex items-center gap-3">
@@ -6314,25 +6429,6 @@ export default function App() {
           </div>
 
           <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
-            {/* Trial Warning Banner */}
-            {!subscriptionExpired && subscriptionStatus === 'trial' && trialDaysLeft !== null && (
-              <div className="bg-amber-50 dark:bg-[#D4AF37]/10 border-b border-amber-200 dark:border-[#D4AF37]/20 text-amber-800 dark:text-[#D4AF37] px-6 py-2.5 text-xs font-bold flex items-center justify-between tracking-wide transition-colors duration-200">
-                <div className="flex items-center gap-2">
-                  <span>💡</span>
-                  <span>
-                    {isRtl 
-                      ? `أنت في فترة التجربة المجانية. متبقي لديك ${trialDaysLeft} أيام.` 
-                      : `You are in your free trial period. You have ${trialDaysLeft} days left.`}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => setSubscriptionExpired(true)} 
-                  className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1 hover:bg-[#e6c44a] transition-all"
-                >
-                  {isRtl ? 'الترقية الآن' : 'Upgrade Now'}
-                </button>
-              </div>
-            )}
             {renderTabContent()}
           </div>
         </main>
@@ -6346,8 +6442,33 @@ export default function App() {
   };
 
   const AuthGateway = () => {
-    const isSubscriptionActive = !subscriptionExpired && (subscriptionStatus === 'active' || subscriptionStatus === 'trial');
-    if (!isSubscriptionActive) {
+    // 1. If not logged in -> CombinedAuthScreen
+    if (!currentUser) {
+      return (
+        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+          {!isOnline && (
+            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+            </div>
+          )}
+          <CombinedAuthScreen 
+            onLogin={handleLogin} 
+            onSignUp={handleSignUp}
+            language={language} 
+            setLanguage={setLanguage} 
+            users={users} 
+            onUpdateUser={handleUpdateUser} 
+          />
+          <NotificationOverlay
+            notifications={notifications}
+            onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+          />
+        </div>
+      );
+    }
+
+    // 2. If logged in, check subscriptionStatus
+    if (subscriptionStatus === 'pending_onboarding') {
       return (
         <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
           {!isOnline && (
@@ -6356,11 +6477,10 @@ export default function App() {
             </div>
           )}
           <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
-            <SubscriptionUpgrade
-              onSubscribe={handleDummySubscribe}
+            <SubscriptionSelectionScreen
+              onSelectPlan={handleSelectSubscriptionPlan}
               onLogout={handleLogout}
               language={language}
-              currentUser={currentUser}
             />
           </main>
           <NotificationOverlay
@@ -6371,31 +6491,33 @@ export default function App() {
       );
     }
 
-    if (currentUser) {
-      return <Dashboard />;
+    // 3. Check if subscription is active/trial and not expired
+    const isSubscriptionActive = !subscriptionExpired && (subscriptionStatus === 'active' || subscriptionStatus === 'trial');
+    if (!isSubscriptionActive) {
+      return (
+        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+          {!isOnline && (
+            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+            </div>
+          )}
+          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
+            <SubscriptionSelectionScreen
+              onSelectPlan={handleSelectSubscriptionPlan}
+              onLogout={handleLogout}
+              language={language}
+            />
+          </main>
+          <NotificationOverlay
+            notifications={notifications}
+            onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+          />
+        </div>
+      );
     }
 
-    return (
-      <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
-        {!isOnline && (
-          <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-            ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
-          </div>
-        )}
-        <CombinedAuthScreen 
-          onLogin={handleLogin} 
-          onSignUp={handleSignUp}
-          language={language} 
-          setLanguage={setLanguage} 
-          users={users} 
-          onUpdateUser={handleUpdateUser} 
-        />
-        <NotificationOverlay
-          notifications={notifications}
-          onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
-        />
-      </div>
-    );
+    // 4. Default -> Dashboard
+    return <Dashboard />;
   };
 
   const t = T[language];
