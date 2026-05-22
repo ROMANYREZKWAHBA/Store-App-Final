@@ -3,11 +3,26 @@ import React, { useState } from 'react';
 export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, language }) {
   const isRtl = language === 'ar';
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPaymentUnavailableModal, setShowPaymentUnavailableModal] = useState(false);
 
+  /**
+   * Trial plan → 2 s processing overlay → activate immediately.
+   * Paid plans → 2 s processing overlay → show "payment gateway unavailable" modal.
+   *             Status is NOT changed; user remains on this screen.
+   */
   const handleSelectSubscriptionPlan = (planType) => {
     setIsProcessing(true);
+
     setTimeout(() => {
-      onSelectPlan(planType);
+      setIsProcessing(false);
+
+      if (planType === 'trial') {
+        // Free trial: proceed with activation
+        onSelectPlan(planType);
+      } else {
+        // Paid plan: gateway not configured — show information modal
+        setShowPaymentUnavailableModal(true);
+      }
     }, 2000);
   };
 
@@ -20,7 +35,11 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 p-6 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 p-6 transition-colors duration-200"
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      {/* ─── Processing Overlay ────────────────────────────────────────────── */}
       {isProcessing && (
         <div className="fixed inset-0 bg-[#0a0a0c]/80 backdrop-blur-md flex items-center justify-center z-[99999] animate-[fadeIn_0.2s_ease-out]">
           <div className="flex flex-col items-center gap-6">
@@ -33,7 +52,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             </div>
             <div className="flex flex-col items-center gap-2">
               <h2 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] animate-pulse">
-                {isRtl ? 'جاري معالجة عملية الدفع...' : 'Processing Payment...'}
+                {isRtl ? 'جاري معالجة الطلب...' : 'Processing Request...'}
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                 {isRtl ? 'يرجى عدم إغلاق هذه الصفحة' : 'Please do not close this window'}
@@ -42,9 +61,72 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
           </div>
         </div>
       )}
+
+      {/* ─── Payment Unavailable Modal ──────────────────────────────────────── */}
+      {showPaymentUnavailableModal && (
+        <div className="fixed inset-0 bg-[#0a0a0c]/85 backdrop-blur-md flex items-center justify-center z-[99998] animate-[fadeIn_0.25s_ease-out] p-6">
+          <div
+            className="w-full max-w-md bg-[#111114] border border-[#D4AF37]/30 rounded-2xl p-8 flex flex-col gap-6 shadow-2xl shadow-[#D4AF37]/5"
+            dir={isRtl ? 'rtl' : 'ltr'}
+          >
+            {/* Icon */}
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center">
+                <span className="text-3xl">⚙️</span>
+              </div>
+            </div>
+
+            {/* Heading */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-black tracking-widest text-amber-400 uppercase">
+                {isRtl ? 'الدفع الإلكتروني قيد التهيئة' : 'E-PAYMENT GATEWAY — SETUP IN PROGRESS'}
+              </div>
+              <h2 className="text-lg font-black text-white leading-snug">
+                {isRtl
+                  ? 'بوابة الدفع الإلكتروني قيد التهيئة حالياً'
+                  : 'Payment Gateway Under Configuration'}
+              </h2>
+              <p className="text-sm text-zinc-400 leading-relaxed font-medium">
+                {isRtl
+                  ? 'بوابات الدفع الإلكتروني قيد التهيئة حالياً. يرجى التواصل مع الإدارة لتفعيل الاشتراك المدفوع.'
+                  : 'Electronic payment gateways are currently being configured. Please contact the administration to activate your paid subscription.'}
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-zinc-800/60" />
+
+            {/* Contact info */}
+            <div className="space-y-2 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                {isRtl ? 'للتواصل مع الإدارة' : 'Contact Administration'}
+              </p>
+              <a
+                href="https://wa.me/201000000000"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#25D366]/20 transition-all"
+              >
+                <span>💬</span>
+                {isRtl ? 'تواصل عبر الواتساب' : 'WhatsApp Support'}
+              </a>
+            </div>
+
+            {/* Close button */}
+            <button
+              onClick={() => setShowPaymentUnavailableModal(false)}
+              className="w-full py-3 bg-transparent border border-zinc-700 hover:border-[#D4AF37]/50 text-zinc-400 hover:text-[#D4AF37] font-black text-[10px] uppercase tracking-widest transition-all rounded-xl"
+            >
+              {isRtl ? '← العودة إلى اختيار الخطة' : '← Back to Plan Selection'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Main Content ───────────────────────────────────────────────────── */}
       <div className="w-full max-w-5xl space-y-12 animate-[fadeIn_0.5s_ease-out]">
-        
-        {/* Style definitions for transitions and animations */}
+
+        {/* Style definitions */}
         <style dangerouslySetInnerHTML={{__html: `
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(15px); }
@@ -67,21 +149,21 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             {isRtl ? 'اختر خطة الاشتراك لمتجرك' : 'Choose Your StorePilot Plan'}
           </h2>
           <p className="text-sm text-slate-500 dark:text-zinc-400 max-w-xl mx-auto font-medium">
-            {isRtl 
-              ? 'يرجى اختيار إحدى الخطط أدناه لتفعيل صلاحية المتجر والولوج فوراً إلى لوحة التحكم ونقاط البيع.' 
+            {isRtl
+              ? 'يرجى اختيار إحدى الخطط أدناه لتفعيل صلاحية المتجر والولوج فوراً إلى لوحة التحكم ونقاط البيع.'
               : 'Select a plan below to activate your retail workstation and gain instant access to dashboard & POS operations.'}
           </p>
         </div>
 
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
+
           {/* Card 1: 7-Day Trial (Highlighted Primary) */}
           <div className="pricing-card bg-white dark:bg-[#151518] border-2 border-[#D4AF37] p-8 rounded-2xl flex flex-col justify-between relative shadow-xl shadow-[#D4AF37]/5">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#D4AF37] text-black font-black text-[9px] uppercase tracking-widest rounded-full">
               {isRtl ? 'الفترة الموصى بها' : 'RECOMMENDED'}
             </div>
-            
+
             <div className="space-y-6">
               <div className="space-y-2">
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider">
@@ -119,7 +201,11 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
           </div>
 
           {/* Card 2: Monthly Premium (499 EGP) */}
-          <div className="pricing-card bg-white dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl flex flex-col justify-between shadow-xl">
+          <div className="pricing-card bg-white dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800/80 p-8 rounded-2xl flex flex-col justify-between shadow-xl relative">
+            {/* "Payment setup" badge */}
+            <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 text-[8px] font-black uppercase tracking-widest">
+              ⚙️ {isRtl ? 'قيد التهيئة' : 'Setup Soon'}
+            </div>
             <div className="space-y-6">
               <div className="space-y-2">
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider">
@@ -161,7 +247,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             <div className="absolute top-2.5 right-2.5 bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-emerald-500/20">
               {isRtl ? 'توفير ٣٣٪' : 'SAVE 33%'}
             </div>
-            
+
             <div className="space-y-6">
               <div className="space-y-2">
                 <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider">
@@ -203,7 +289,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
         {/* Bottom Actions */}
         <button
           onClick={handleLogout}
-          className="text-xs font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-4 block mx-auto font-bold"
+          className="text-xs font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 transition-colors pt-4 block mx-auto"
         >
           {isRtl ? '✕ تسجيل الخروج والعودة' : '✕ Logout and Return'}
         </button>

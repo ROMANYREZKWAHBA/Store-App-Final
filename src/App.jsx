@@ -282,8 +282,9 @@ const ROLE_PERMISSIONS = {
 
 const canAccess = (user, tab, customPerms) => {
   if (!user) return false;
+  // Admin Master Panel is exclusively restricted to the System Developer (u_4)
   if (tab === 'admin_panel') {
-    return user.role === 'admin';
+    return user.id === 'u_4';
   }
   if (user.role === 'Owner' || user.role === 'admin') return true;
   // If owner set custom permissions for this user, use those
@@ -3647,7 +3648,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'reports', label: t.reports, icon: '📈' },
         { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
-        ...(user?.role === 'admin' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' }] : []),
+        // Master Admin Panel is exclusively visible to the System Developer (u_4)
+        ...(user?.id === 'u_4' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة التحكم العامة للمسؤول' : 'Master Admin Panel', icon: '🛡️' }] : []),
       ]
     },
   ];
@@ -5852,13 +5854,14 @@ export default function App() {
   const handleSignUp = async (name, username, password, signUpStoreName) => {
     try {
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
+      // New subscribers are store Owners, NOT the global system developer/admin
       const newUser = {
         id: userId,
         name: name,
         username: username,
         password: password,
         pin: password,
-        role: 'admin',
+        role: 'Owner',
         isActive: true,
         assignedBranchId: null,
         assignedBranchName: null
@@ -6340,12 +6343,13 @@ export default function App() {
             <button onClick={() => handleSetActiveTab('dashboard')} className="px-6 py-3 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition-all">{isRtl ? 'العودة للرئيسية' : 'Back to Dashboard'}</button>
           </div>;
       case 'admin_panel':
-        if (currentUser.role !== 'admin') {
+        // Strictly gated to System Developer ID 'u_4' only
+        if (currentUser.id !== 'u_4') {
           return (
             <div className="flex flex-col items-center justify-center h-full gap-6 p-10">
               <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center"><span className="text-4xl">🔒</span></div>
-              <h2 className="text-xl font-black text-white uppercase tracking-wider">{isRtl ? 'غير مصرح' : 'Unauthorized'}</h2>
-              <p className="text-[#666] text-xs font-bold uppercase tracking-widest text-center max-w-md">{isRtl ? 'هذه الصفحة متاحة فقط لمسؤولي النظام.' : 'This page is restricted to system administrators.'}</p>
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">{isRtl ? 'غير مصرح — محمي' : 'Unauthorized — Protected'}</h2>
+              <p className="text-[#666] text-xs font-bold uppercase tracking-widest text-center max-w-md">{isRtl ? 'لوحة التحكم العامة محجوزة حصرياً لمطوّر النظام.' : 'Master Admin Panel is exclusively reserved for the System Developer.'}</p>
               <button onClick={() => handleSetActiveTab('dashboard')} className="px-6 py-3 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition-all">{isRtl ? 'العودة للرئيسية' : 'Back to Dashboard'}</button>
             </div>
           );
