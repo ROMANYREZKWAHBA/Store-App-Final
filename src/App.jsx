@@ -3583,6 +3583,33 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 // SIDEBAR
 // ============================================================
 function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName }) {
+  const currentUser = user;
+  if (currentUser) {
+    console.log("Current User Role: " + currentUser.role);
+    if (currentUser.id === 'u_4') {
+      if (currentUser.role !== 'admin') {
+        currentUser.role = 'admin';
+      }
+      try {
+        const localUsersStr = localStorage.getItem('pos_users');
+        const localUsers = localUsersStr ? JSON.parse(localUsersStr) : DEFAULT_USERS;
+        let updated = false;
+        const newUsers = localUsers.map(u => {
+          if (u.id === 'u_4' && u.role !== 'admin') {
+            updated = true;
+            return { ...u, role: 'admin' };
+          }
+          return u;
+        });
+        if (updated || !localUsersStr) {
+          localStorage.setItem('pos_users', JSON.stringify(newUsers));
+        }
+      } catch (e) {
+        console.error('Error fixing admin user in localStorage:', e);
+      }
+    }
+  }
+
   const t = T[language];
   const isRtl = language === 'ar';
 
@@ -6342,6 +6369,30 @@ export default function App() {
   };
 
   const Dashboard = () => {
+    // Force-check Admin role
+    if (currentUser && currentUser.id === 'u_4') {
+      if (currentUser.role !== 'admin') {
+        currentUser.role = 'admin';
+      }
+      try {
+        const localUsersStr = localStorage.getItem('pos_users');
+        const localUsers = localUsersStr ? JSON.parse(localUsersStr) : DEFAULT_USERS;
+        let updated = false;
+        const newUsers = localUsers.map(u => {
+          if (u.id === 'u_4' && u.role !== 'admin') {
+            updated = true;
+            return { ...u, role: 'admin' };
+          }
+          return u;
+        });
+        if (updated || !localUsersStr) {
+          localStorage.setItem('pos_users', JSON.stringify(newUsers));
+        }
+      } catch (e) {
+        console.error('Error fixing admin user in localStorage:', e);
+      }
+    }
+
     const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
     const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
     const localSubEnd = localStorage.getItem('pos_subscription_end_date');

@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, language }) {
   const isRtl = language === 'ar';
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSelectSubscriptionPlan = (planType) => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      onSelectPlan(planType);
+    }, 2000);
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -13,6 +21,27 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 p-6 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+      {isProcessing && (
+        <div className="fixed inset-0 bg-[#0a0a0c]/80 backdrop-blur-md flex items-center justify-center z-[99999] animate-[fadeIn_0.2s_ease-out]">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 border-4 border-[#D4AF37]/10 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-5 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-full animate-pulse flex items-center justify-center">
+                <span className="text-xl">💳</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <h2 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] animate-pulse">
+                {isRtl ? 'جاري معالجة عملية الدفع...' : 'Processing Payment...'}
+              </h2>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                {isRtl ? 'يرجى عدم إغلاق هذه الصفحة' : 'Please do not close this window'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-5xl space-y-12 animate-[fadeIn_0.5s_ease-out]">
         
         {/* Style definitions for transitions and animations */}
@@ -82,7 +111,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             </div>
 
             <button
-              onClick={() => onSelectPlan('trial')}
+              onClick={() => handleSelectSubscriptionPlan('trial')}
               className="w-full mt-8 py-4 bg-[#D4AF37] hover:bg-[#e6c44a] text-black font-black text-xs uppercase tracking-widest transition-all rounded-xl shadow-lg shadow-[#D4AF37]/20"
             >
               🚀 {isRtl ? 'بدء التجربة المجانية' : 'Start Free Trial'}
@@ -120,7 +149,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             </div>
 
             <button
-              onClick={() => onSelectPlan('monthly')}
+              onClick={() => handleSelectSubscriptionPlan('monthly')}
               className="w-full mt-8 py-4 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black text-xs uppercase tracking-widest transition-all rounded-xl shadow-lg shadow-[#0066FF]/20"
             >
               💳 {isRtl ? 'اشتراك شهري' : 'Select Monthly'}
@@ -153,7 +182,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
                   <span className="text-[#0066FF]">✓</span> {isRtl ? 'جميع مميزات الباقة الشهرية' : 'All Monthly Premium Features'}
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-[#0066FF]">✓</span> {isRtl ? 'دعم فني فوري مخصص ٢٤/٧' : 'Priority 24/7 VIP Support'}
+                  <span className="text-[#0066FF]">✓</span> {isRtl ? 'دعم فني فورى مخصص ٢٤/٧' : 'Priority 24/7 VIP Support'}
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#0066FF]">✓</span> {isRtl ? 'مستقبل ترقيات الأنظمة مجاناً' : 'Free Lifetime Feature Upgrades'}
@@ -162,7 +191,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             </div>
 
             <button
-              onClick={() => onSelectPlan('yearly')}
+              onClick={() => handleSelectSubscriptionPlan('yearly')}
               className="w-full mt-8 py-4 bg-zinc-900 hover:bg-black dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-black text-xs uppercase tracking-widest transition-all rounded-xl"
             >
               ⭐ {isRtl ? 'اشتراك سنوي (أفضل قيمة)' : 'Select Yearly'}
