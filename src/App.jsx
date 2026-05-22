@@ -7,6 +7,7 @@ import StockTransfersScreen from './StockTransfers';
 import SubscriptionUpgrade from './SubscriptionUpgrade';
 import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
+import LandingPage from './LandingPage';
 
 // Inject Google Fonts
 const styleEl = document.createElement('link');
@@ -3205,113 +3206,118 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
   }, [selectedRole, authMode]);
 
   return (
-    <div className="login-rounded min-h-screen w-full bg-slate-50 dark:bg-black flex flex-col md:grid md:grid-cols-2 overflow-x-hidden relative animate-[loginFadeIn_0.5s_ease-out] transition-all duration-500 ease-in-out" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      className="enterprise-ui min-h-screen w-full flex flex-col md:grid md:grid-cols-2 overflow-x-hidden relative"
+      style={{ background: '#f8fafc', fontFamily: isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       
-      {/* Styles for advanced premium animations */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes loginFadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes glowPulse {
-          0%, 100% {
-            box-shadow: 0 0 20px rgba(0, 102, 255, 0.25), inset 0 0 15px rgba(212, 175, 55, 0.1);
-            transform: scale(1) rotate(0deg);
-          }
-          50% {
-            box-shadow: 0 0 45px rgba(0, 102, 255, 0.45), inset 0 0 25px rgba(212, 175, 55, 0.25);
-            transform: scale(1.03) rotate(180deg);
-          }
-        }
-        @keyframes glowPulseInner {
-          0%, 100% { transform: scale(1); opacity: 0.85; }
-          50% { transform: scale(1.08); opacity: 1; }
-        }
-        @keyframes slideUpFade {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}} />
+      {/* Styles */}
+      <style>{`
+        @keyframes authFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .auth-fade { animation: authFadeIn 0.5s ease-out both; }
+        .slide-fade { animation: slideUpFade 0.25s ease-out both; }
+      `}</style>
 
-      {/* Left Side (Visuals) */}
-      <div className="hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950 via-slate-900 to-black text-white p-12 relative overflow-hidden select-none">
-        {/* Glowing backdrop decorative gradients */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,102,255,0.12),transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(212,175,55,0.06),transparent_55%)]" />
-        
-        {/* Animated 3D-like glowing logo */}
-        <div className="relative flex items-center justify-center w-72 h-72 mb-10">
-          <div className="absolute w-60 h-60 rounded-full border border-dashed border-[#D4AF37]/35 animate-[spin_40s_linear_infinite]" />
-          <div className="absolute w-48 h-48 rounded-full border-4 border-double border-t-[#0066FF] border-b-[#D4AF37] border-l-transparent border-r-transparent animate-[glowPulse_10s_ease-in-out_infinite]" />
-          <div className="absolute w-36 h-36 rounded-full bg-gradient-to-tr from-[#0066FF]/15 to-[#D4AF37]/15 flex items-center justify-center backdrop-blur-sm border border-white/5 animate-[glowPulseInner_5s_ease-in-out_infinite]">
-            <span className="text-6xl filter drop-shadow-[0_0_15px_rgba(212,175,55,0.5)]">🚀</span>
-          </div>
-        </div>
+      {/* Left Panel — Enterprise illustration */}
+      <div
+        className="hidden md:flex flex-col items-center justify-center p-12 relative overflow-hidden select-none"
+        style={{ background: 'linear-gradient(145deg, #1e3a8a 0%, #1e40af 60%, #2563eb 100%)' }}
+      >
+        {/* Subtle pattern */}
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 20%, #fff 1px, transparent 1px), radial-gradient(circle at 70% 80%, #fff 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
+        <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #60a5fa, transparent)', transform: 'translate(30%, -30%)' }} />
 
-        {/* Branding & Marketing message */}
-        <div className="text-center max-w-md space-y-4 z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-black tracking-widest text-[#D4AF37] uppercase">
-            ⚡ STOREPILOT PLATINUM
+        {/* Logo */}
+        <div className="relative z-10 text-center space-y-8">
+          <div className="flex justify-center">
+            <div className="w-24 h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-5xl" style={{ backdropFilter: 'blur(8px)' }}>🚀</div>
           </div>
-          <h3 className="text-3xl font-black tracking-tight uppercase">
-            {isRtl ? 'الجيل القادم من نقاط البيع' : 'The Next Generation POS'}
-          </h3>
-          <p className="text-xs text-zinc-400 font-bold tracking-wide leading-relaxed uppercase">
-            {isRtl 
-              ? 'نظام تشغيل متكامل لإدارة المبيعات والمخزون والموظفين بكفاءة متناهية.' 
-              : 'Unified Retail OS powering enterprise branch logistics, shifts, and high-frequency cash operations.'}
-          </p>
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-black tracking-widest text-white/80 uppercase">
+              ⚡ STOREPILOT PRO
+            </div>
+            <h3 className="text-3xl font-black text-white tracking-tight">
+              {isRtl ? 'نظام ERP متكامل' : 'Complete Retail ERP'}
+            </h3>
+            <p className="text-blue-200 text-sm font-medium leading-relaxed max-w-xs mx-auto">
+              {isRtl
+                ? 'مبيعات · مخزون · موظفين · تقارير · متعدد الفروع'
+                : 'Sales · Inventory · Staff · Reports · Multi-Branch'}
+            </p>
+          </div>
+          {/* Feature pills */}
+          <div className="flex flex-wrap justify-center gap-2 mt-4">
+            {['🧾 POS', '📦 Inventory', '👥 HR', '📊 Reports', '☁️ Cloud'].map(f => (
+              <span key={f} className="px-3 py-1.5 rounded-full text-xs font-bold text-white/80 bg-white/10 border border-white/15">{f}</span>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Right Side (Form) */}
-      <div className="flex items-center justify-center bg-slate-50 dark:bg-black p-6 md:p-12 relative min-h-screen">
-        {/* Language selector and top branding for mobile viewports */}
+      <div className="flex items-center justify-center p-6 md:p-12 relative min-h-screen" style={{ background: '#f8fafc' }}>
+        {/* Top row: mobile logo + language */}
         <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
           <div className="flex items-center gap-2 md:hidden">
-            <div className="w-8 h-8 rounded-lg bg-[#0066FF] flex items-center justify-center text-white text-base">🚀</div>
-            <span className="font-black tracking-widest text-sm uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
+            <div className="w-8 h-8 rounded-lg bg-[#1e40af] flex items-center justify-center text-white text-sm">🚀</div>
+            <span className="font-black text-sm text-[#1e293b]">StorePilot <span className="text-[#1e40af]">PRO</span></span>
           </div>
-          <button onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-            className="px-5 py-2.5 border border-zinc-300 dark:border-zinc-800 text-[#D4AF37] font-black uppercase text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-all ml-auto">
+          <button
+            onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
+            className="px-4 py-2 border border-[#e2e8f0] text-[#64748b] hover:text-[#1e40af] hover:border-[#1e40af] font-bold text-sm rounded-lg transition-all ml-auto"
+          >
             {isRtl ? 'English' : 'العربية'}
           </button>
         </div>
 
-        {/* Center-aligned Glassmorphism card with fade-in on load */}
-        <div className="w-full max-w-md bg-white/80 dark:bg-[#161618]/70 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 p-8 md:p-10 space-y-8 shadow-2xl rounded-2xl animate-[loginFadeIn_0.5s_ease-out] transition-all duration-500 ease-in-out">
-          <div className="text-center space-y-2">
-            <div className="hidden md:flex justify-center gap-2 items-center">
-              <span className="font-black tracking-widest text-lg uppercase text-[var(--text-primary)]">StorePilot <span className="text-[#D4AF37]">PRO</span></span>
+        {/* Enterprise Auth Card — white, blue top border, soft shadow */}
+        <div
+          className="auth-fade w-full max-w-md bg-white p-8 md:p-10 space-y-7"
+          style={{
+            borderRadius: 16,
+            borderTop: '5px solid #1e40af',
+            boxShadow: '0 4px 24px rgba(30,64,175,0.10), 0 1px 6px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div className="text-center space-y-1">
+            <div className="flex justify-center gap-2 items-center mb-2">
+              <div className="w-9 h-9 bg-[#1e40af] rounded-lg flex items-center justify-center text-white text-base">🚀</div>
+              <span className="font-black text-[#1e293b] text-base">StorePilot <span className="text-[#1e40af]">PRO</span></span>
             </div>
-            <h2 className={`text-3xl font-black text-[var(--text-primary)] tracking-tight ${isRtl ? '' : 'uppercase'}`}>
-              {authMode === 'login' ? (isRtl ? 'سجل دخولك' : 'Secure Login') : (isRtl ? 'بدء فترة تجريبية' : 'Start Trial')}
+            <h2 className="font-black text-[#1e293b] text-2xl">
+              {authMode === 'login' ? (isRtl ? 'تسجيل الدخول' : 'Sign In') : (isRtl ? 'إنشاء حساب جديد' : 'Create Account')}
             </h2>
-            <p className="text-[#D4AF37] font-black text-[10px] uppercase tracking-widest">
-              {isRtl ? 'بوابة التجار المحترفين' : 'Retail OS Bloomberg Edition'}
+            <p className="text-[#64748b] font-medium text-sm">
+              {authMode === 'login'
+                ? (isRtl ? 'أدخل بياناتك للدخول إلى لوحة التحكم' : 'Enter your credentials to access your dashboard')
+                : (isRtl ? 'ابدأ تجربتك المجانية لمدة 7 أيام' : 'Start your 7-day free trial — no card needed')}
             </p>
           </div>
 
           {error && (
-            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
-              <p className="text-rose-500 text-[10px] font-black text-center uppercase tracking-widest">⚠️ {error}</p>
+            <div className="p-3.5 rounded-xl flex items-center gap-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+              <span className="text-lg">⚠️</span>
+              <p className="text-red-600 text-xs font-bold">{error}</p>
             </div>
           )}
 
           {authMode === 'login' ? (
-            <div key="login" className="space-y-6 animate-[slideUpFade_0.25s_ease-out]">
+            <div key="login" className="space-y-5 slide-fade">
               {/* Role Selector Tabs */}
-              <div className="flex bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/70 p-1.5 rounded-2xl">
+              <div className="flex p-1 rounded-xl" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
                 {['Cashier', 'Admin', 'Owner'].map(role => (
-                  <button 
-                    key={role} 
+                  <button
+                    key={role}
                     type="button"
                     onClick={() => setSelectedRole(role)}
-                    className={`flex-1 py-3 font-black text-[11px] uppercase tracking-widest rounded-xl transition-all duration-300 ${
-                      selectedRole === role 
-                        ? 'bg-[#0066FF] text-white shadow-md' 
-                        : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-                    }`}
+                    className="flex-1 py-2.5 font-black text-xs uppercase tracking-widest rounded-lg transition-all duration-200"
+                    style={{
+                      background: selectedRole === role ? '#1e40af' : 'transparent',
+                      color: selectedRole === role ? '#ffffff' : '#64748b',
+                      boxShadow: selectedRole === role ? '0 2px 8px rgba(30,64,175,0.25)' : 'none',
+                    }}
                   >
                     {role}
                   </button>
@@ -3319,39 +3325,38 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
               </div>
 
               {selectedRole === 'Cashier' ? (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                      {isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={pin}
-                        onChange={handlePinChange}
-                        onFocus={() => setIsKeypadVisible(true)}
-                        onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
-                        placeholder="••••••"
-                        maxLength={6}
-                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] text-center text-xl tracking-[0.5em] outline-none focus:border-[#0066FF] rounded-xl transition-all duration-300"
-                      />
-                    </div>
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}</label>
+                    <input
+                      type="password"
+                      value={pin}
+                      onChange={handlePinChange}
+                      onFocus={() => setIsKeypadVisible(true)}
+                      onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
+                      placeholder="••••••"
+                      maxLength={6}
+                      className="e-input text-center text-xl tracking-[0.5em]"
+                    />
                   </div>
 
-                  {/* Hidden Keypad: Appears only on focus with transition animation */}
+                  {/* PIN Keypad */}
                   {isKeypadVisible && (
-                    <div className="grid grid-cols-3 gap-2.5 animate-[slideUpFade_0.25s_ease-out]">
+                    <div className="grid grid-cols-3 gap-2 slide-fade">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
                         <button
                           key={btn}
                           type="button"
-                          onMouseDown={(e) => e.preventDefault()} // Prevents password field blur
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             if (btn === 'CLR') setPin('');
                             else if (btn === '⌫') setPin(p => p.slice(0, -1));
                             else if (pin.length < 6) setPin(p => p + String(btn));
                           }}
-                          className="h-12 bg-zinc-100/80 hover:bg-zinc-200 dark:bg-zinc-800/40 dark:hover:bg-zinc-700/60 text-[var(--text-primary)] text-base font-black border border-zinc-200/50 dark:border-zinc-700/40 hover:border-[#0066FF] dark:hover:border-[#0066FF] hover:text-[#0066FF] dark:hover:text-[#0066FF] rounded-xl transition-all flex items-center justify-center"
+                          className="h-11 font-black text-sm rounded-lg transition-all"
+                          style={{ background: '#f1f5f9', color: '#1e293b', border: '1px solid #e2e8f0' }}
+                          onMouseOver={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#1e40af'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#1e293b'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
                         >
                           {btn}
                         </button>
@@ -3359,128 +3364,85 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                     </div>
                   )}
 
-                  <button 
+                  <button
                     type="button"
-                    onClick={handlePin} 
+                    onClick={handlePin}
                     disabled={pin.length < 4 || isLoggingIn}
-                    className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all disabled:opacity-20 shadow-lg shadow-[#0066FF]/20"
+                    className="e-btn-primary w-full py-3.5 rounded-xl text-sm"
                   >
-                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'فتح المحطة' : 'Open Terminal')}
+                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول' : 'Sign In')}
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                      {isRtl ? 'اسم المستخدم' : 'Username'}
-                    </label>
-                    <input 
-                      type="text" 
-                      value={username} 
-                      onChange={e => setUsername(e.target.value)}
-                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                    />
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
+                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Enter username...'} />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                      {isRtl ? 'كلمة المرور' : 'Password'}
-                    </label>
-                    <input 
-                      type="password" 
-                      value={password} 
-                      onChange={e => setPassword(e.target.value)}
-                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="e-input" placeholder="••••••••" />
                   </div>
-                  <button 
+                  <button
                     type="button"
-                    onClick={handleCredentials} 
+                    onClick={handleCredentials}
                     disabled={isLoggingIn}
-                    className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all mt-4 shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
+                    className="e-btn-primary w-full py-3.5 rounded-xl text-sm mt-2"
                   >
-                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول للنظام' : 'Access System')}
+                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول' : 'Sign In')}
                   </button>
                 </div>
               )}
 
-              <button onClick={handleRecovery} className="w-full text-[9px] font-black text-[#D4AF37] uppercase tracking-[2px] opacity-60 hover:opacity-100 transition-all block mt-4">
-                {isRtl ? 'نسيت بيانات الدخول؟ (استعادة)' : 'Forgotten Credentials? (Recover)'}
+              <button onClick={handleRecovery} className="w-full text-xs font-bold text-[#64748b] hover:text-[#1e40af] transition-all mt-2">
+                {isRtl ? 'نسيت بيانات الدخول؟' : 'Forgot credentials?'}
               </button>
             </div>
           ) : (
-            <div key="signup" className="space-y-6 animate-[slideUpFade_0.25s_ease-out]">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                  {isRtl ? 'اسم المتجر' : 'Store Name'}
-                </label>
-                <input 
-                  type="text" 
-                  value={signUpStoreName} 
-                  onChange={e => setSignUpStoreName(e.target.value)}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                  placeholder={isRtl ? 'اسم المتجر...' : 'Store Name...'}
-                />
+            <div key="signup" className="space-y-4 slide-fade">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المتجر' : 'Store Name'}</label>
+                <input type="text" value={signUpStoreName} onChange={e => setSignUpStoreName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم متجرك...' : 'Your store name...'} />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                  {isRtl ? 'الاسم الكامل للمالك' : 'Owner Full Name'}
-                </label>
-                <input 
-                  type="text" 
-                  value={signUpName} 
-                  onChange={e => setSignUpName(e.target.value)}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                  placeholder={isRtl ? 'الاسم الكامل...' : 'Full Name...'}
-                />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'الاسم الكامل' : 'Full Name'}</label>
+                <input type="text" value={signUpName} onChange={e => setSignUpName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسمك الكامل...' : 'Your full name...'} />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                  {isRtl ? 'اسم المستخدم' : 'Username'}
-                </label>
-                <input 
-                  type="text" 
-                  value={signUpUsername} 
-                  onChange={e => setSignUpUsername(e.target.value)}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                  placeholder={isRtl ? 'اسم المستخدم...' : 'Username...'}
-                />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
+                <input type="text" value={signUpUsername} onChange={e => setSignUpUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Choose a username...'} />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest block">
-                  {isRtl ? 'كلمة المرور' : 'Password'}
-                </label>
-                <input 
-                  type="password" 
-                  value={signUpPassword} 
-                  onChange={e => setSignUpPassword(e.target.value)}
-                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] px-6 py-4 font-bold text-[var(--text-primary)] outline-none focus:border-[#0066FF] rounded-xl transition-all" 
-                  placeholder="••••••••"
-                />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                <input type="password" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} className="e-input" placeholder="••••••••" />
               </div>
-              <button 
+              <button
                 type="button"
-                onClick={handleSignUpSubmit} 
+                onClick={handleSignUpSubmit}
                 disabled={isRegistering}
-                className="w-full py-4.5 bg-[#0066FF] hover:bg-[#0052cc] text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-[#0066FF]/20 disabled:opacity-20"
+                className="e-btn-primary w-full py-3.5 rounded-xl text-sm mt-2"
               >
-                {isRegistering ? (isRtl ? 'جاري التسجيل...' : 'Registering...') : (isRtl ? 'بدء الفترة التجريبية (7 أيام)' : 'Start 7-Day Free Trial')}
+                {isRegistering ? (isRtl ? 'جاري إنشاء الحساب...' : 'Creating account...') : (isRtl ? '🚀 بدء التجربة المجانية 7 أيام' : '🚀 Start 7-Day Free Trial')}
               </button>
+              <p className="text-center text-xs text-[#94a3b8] font-medium">
+                {isRtl ? 'لا توجد رسوم، لا بطاقة ائتمان مطلوبة.' : 'No charge. No credit card required.'}
+              </p>
             </div>
           )}
 
-          {/* Toggle Button for Auth Mode */}
-          <div className="flex flex-col items-center gap-3 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50">
-            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              {isRtl ? 'أو' : 'OR'}
-            </span>
-            <button 
+          {/* Toggle Auth Mode */}
+          <div className="pt-4 border-t border-[#e2e8f0] text-center">
+            <button
               type="button"
               onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-              className="px-5 py-2.5 border border-zinc-300 dark:border-zinc-800 text-[var(--text-primary)] hover:text-[#0066FF] dark:hover:text-[#D4AF37] font-black uppercase text-xs hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-all w-full text-center"
+              className="text-sm font-semibold transition-all"
+              style={{ color: '#64748b' }}
+              onMouseOver={e => e.currentTarget.style.color = '#1e40af'}
+              onMouseOut={e => e.currentTarget.style.color = '#64748b'}
             >
-              {authMode === 'login' 
-                ? (isRtl ? 'إنشاء حساب تجريبي جديد' : 'Create New Trial Account') 
-                : (isRtl ? 'العودة لتسجيل الدخول' : 'Back to Login')}
+              {authMode === 'login'
+                ? (isRtl ? 'ليس لديك حساب؟ ابدأ تجربة مجانية →' : "Don't have an account? Start free trial →")
+                : (isRtl ? 'لديك حساب؟ تسجيل الدخول →' : 'Already have an account? Sign in →')}
             </button>
           </div>
         </div>
@@ -3488,9 +3450,9 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 
       {/* Recovery Modal remains perfectly functional */}
       {showRecoveryModal && (
-        <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[400] p-4 text-[var(--text-primary)]">
-          <div className="bg-[var(--bg-sidebar)] border border-rose-500/30 p-8 max-w-sm w-full shadow-2xl rounded-2xl relative">
-            <h3 className="text-xl font-black text-rose-500 mb-6 uppercase tracking-widest border-b border-rose-500/20 pb-2">
+        <div className="absolute inset-0 flex items-center justify-center z-[400] p-4" style={{ background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)' }}>
+          <div className="p-8 max-w-sm w-full relative" style={{ background: '#fff', borderRadius: 16, borderTop: '4px solid #ef4444', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
+            <h3 className="text-lg font-black text-red-600 mb-5 pb-3" style={{ borderBottom: '1px solid #fecaca' }}>
               {isRtl ? 'استعادة الحساب' : 'Security Recovery'}
             </h3>
             
@@ -3654,48 +3616,50 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
     },
   ];
 
-  const w = collapsed ? 'w-[80px]' : 'w-[260px]';
+  const w = collapsed ? 'w-[72px]' : 'w-[256px]';
 
   return (
     <aside
-      className={`${w} bg-[var(--bg-sidebar)] h-screen flex flex-col shrink-0 transition-all duration-300 ease-in-out`}
-      style={{ borderRight: isRtl ? 'none' : '1px solid #222', borderLeft: isRtl ? '1px solid #222' : 'none' }}
+      style={{
+        width: collapsed ? 72 : 256,
+        background: '#ffffff',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+        transition: 'width 0.25s ease',
+        borderRight: isRtl ? 'none' : '1px solid #e2e8f0',
+        borderLeft: isRtl ? '1px solid #e2e8f0' : 'none',
+        overflow: 'hidden',
+      }}
     >
       {/* Logo Row */}
-      <div className="flex items-center justify-between px-4 py-6 border-b border-white/5 relative">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: '20px 16px', borderBottom: '1px solid #e2e8f0', position: 'relative', flexShrink: 0 }}>
         {!collapsed && (
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-[#0066FF] flex items-center justify-center shrink-0">
-              <span style={{ fontSize: 20 }}>🚀</span>
-            </div>
-            <div>
-              <p style={{ color: '#fff', fontWeight: 900, fontSize: 16, letterSpacing: '1px', textTransform: 'uppercase' }}>StorePilot</p>
-              <p style={{ color: '#D4AF37', fontWeight: 700, fontSize: 10, letterSpacing: '2px', textTransform: 'uppercase' }}>Bloomberg Edition</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+            <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>🚀</div>
+            <div style={{ overflow: 'hidden' }}>
+              <p style={{ color: '#1e293b', fontWeight: 900, fontSize: 14, letterSpacing: '0.5px', margin: 0 }}>StorePilot</p>
+              <p style={{ color: '#1e40af', fontWeight: 700, fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>PRO</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="w-10 h-10 bg-[#0066FF] flex items-center justify-center mx-auto">
-            <span style={{ fontSize: 20 }}>🚀</span>
-          </div>
+          <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🚀</div>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
           style={{
             position: 'absolute',
-            top: '50%',
-            transform: 'translateY(-50%)',
+            top: '50%', transform: 'translateY(-50%)',
             [isRtl ? 'left' : 'right']: collapsed ? '-12px' : '10px',
-            width: 24,
-            height: 24,
-            background: '#111',
-            border: '1px solid #222',
-            color: '#888',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 60
+            width: 22, height: 22,
+            background: '#fff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '50%',
+            color: '#94a3b8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 60, fontSize: 11, fontWeight: 900,
           }}
         >
           {collapsed ? (isRtl ? '‹' : '›') : (isRtl ? '›' : '‹')}
@@ -3704,35 +3668,36 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
 
       {/* User Badge */}
       {!collapsed && (
-        <div style={{ margin: '16px 0', background: '#111', padding: '16px 20px', borderY: '1px solid #222' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, background: '#0066FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 16, flexShrink: 0 }}>
-              {user?.name?.[0] || 'U'}
+        <div style={{ margin: '12px 12px 4px', background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 14, flexShrink: 0 }}>
+              {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div style={{ overflow: 'hidden' }}>
-              <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name || 'User'}</p>
-              <p style={{ color: '#D4AF37', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px' }}>{user?.role}</p>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
+              <p style={{ color: '#1e293b', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{user?.name || 'User'}</p>
+              <p style={{ color: '#1e40af', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>{user?.role}</p>
             </div>
           </div>
           {activeBranchName && (
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', padding: '6px 10px', border: '1px solid #222' }}>
-              <span style={{ fontSize: 12 }}>🏢</span>
-              <span style={{ color: '#0066FF', fontWeight: 800, fontSize: 10, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeBranchName}</span>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, background: '#eff6ff', padding: '5px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+              <span style={{ fontSize: 11 }}>🏢</span>
+              <span style={{ color: '#1e40af', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeBranchName}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Nav Groups */}
-      <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 0' }}>
+      <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 8px' }}>
         {groups.map(group => (
-          <div key={group.label} style={{ marginBottom: 20 }}>
+          <div key={group.label} style={{ marginBottom: 16 }}>
             {!collapsed && (
-              <p style={{ color: '#444', fontWeight: 900, fontSize: 9, textTransform: 'uppercase', letterSpacing: '2px', padding: '0 20px', marginBottom: 8 }}>{group.label}</p>
+              <p style={{ color: '#94a3b8', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', padding: '0 8px', marginBottom: 6, marginTop: 4 }}>{group.label}</p>
             )}
             {group.items.map(tab => {
               const hasPerm = canAccess(user, tab.id, userPermissions);
               const isActive = activeTab === tab.id;
+              const isAdmin = tab.id === 'admin_panel';
               return (
                 <button key={tab.id}
                   onClick={() => hasPerm && setActiveTab(tab.id)}
@@ -3742,31 +3707,37 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: collapsed ? 0 : 15,
+                    gap: collapsed ? 0 : 10,
                     justifyContent: collapsed ? 'center' : 'flex-start',
-                    padding: '12px 20px',
-                    marginBottom: 1,
+                    padding: collapsed ? '10px 0' : '9px 10px',
+                    marginBottom: 2,
                     border: 'none',
+                    borderRadius: 8,
                     cursor: hasPerm ? 'pointer' : 'not-allowed',
-                    transition: 'all 0.1s',
-                    background: isActive ? '#0066FF' : 'transparent',
-                    opacity: hasPerm ? 1 : 0.2,
-                    borderLeft: !isRtl && isActive ? '4px solid #D4AF37' : 'none',
-                    borderRight: isRtl && isActive ? '4px solid #D4AF37' : 'none',
+                    transition: 'all 0.15s ease',
+                    background: isActive ? (isAdmin ? '#fef9c3' : '#eff6ff') : 'transparent',
+                    opacity: hasPerm ? 1 : 0.3,
+                    borderRight: !isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : '#1e40af') : '3px solid transparent',
+                    borderLeft: isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : '#1e40af') : '3px solid transparent',
                   }}
-                  onMouseOver={e => { if (!isActive && hasPerm) e.currentTarget.style.background = '#1a1a1a'; }}
-                  onMouseOut={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                  onMouseOver={e => { if (!isActive && hasPerm) { e.currentTarget.style.background = '#f8fafc'; } }}
+                  onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; } }}
                 >
-                  <span style={{ fontSize: 18, flexShrink: 0, filter: isActive ? 'none' : 'grayscale(100%)', color: isActive ? '#fff' : '#888' }}>{tab.icon}</span>
+                  <span style={{ fontSize: 17, flexShrink: 0 }}>{tab.icon}</span>
                   {!collapsed && (
                     <span style={{
-                      color: isActive ? '#fff' : '#888',
-                      fontWeight: isActive ? 800 : 700,
-                      fontSize: isRtl ? 14 : 13,
+                      color: isActive ? (isAdmin ? '#b45309' : '#1e40af') : '#64748b',
+                      fontWeight: isActive ? 800 : 600,
+                      fontSize: isRtl ? 13 : 12,
                       whiteSpace: 'nowrap',
-                      textTransform: isRtl ? 'none' : 'uppercase',
-                      letterSpacing: isRtl ? '0' : '0.5px',
+                      textTransform: isRtl ? 'none' : 'none',
+                      letterSpacing: '0.2px',
+                      flex: 1,
+                      textAlign: isRtl ? 'right' : 'left',
                     }}>{tab.label}</span>
+                  )}
+                  {!collapsed && isActive && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isAdmin ? '#eab308' : '#1e40af', flexShrink: 0 }} />
                   )}
                 </button>
               );
@@ -3776,15 +3747,23 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="mt-auto border-t border-white/5 p-2 space-y-1">
-        <button onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-          className="w-full flex items-center gap-3 px-4 py-3 text-[#D4AF37] font-black uppercase text-[10px] tracking-widest hover:bg-[#D4AF37]/5 transition-all">
-          <span className="text-sm">🌐</span>
+      <div style={{ borderTop: '1px solid #e2e8f0', padding: '8px', flexShrink: 0 }}>
+        <button
+          onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: collapsed ? '10px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', transition: 'all 0.15s' }}
+          onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <span style={{ fontSize: 16 }}>🌐</span>
           {!collapsed && <span>{isRtl ? 'English' : 'العربية'}</span>}
         </button>
-        <button onClick={() => { if (window.confirm(isRtl ? 'هل تريد تسجيل الخروج؟' : 'Logout?')) onLogout(); }}
-          className="w-full flex items-center gap-3 px-4 py-3 text-rose-500 font-black uppercase text-[10px] tracking-widest hover:bg-rose-500/5 transition-all">
-          <span className="text-sm">🚪</span>
+        <button
+          onClick={() => { if (window.confirm(isRtl ? 'هل تريد تسجيل الخروج؟' : 'Logout?')) onLogout(); }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: collapsed ? '10px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', transition: 'all 0.15s' }}
+          onMouseOver={e => e.currentTarget.style.background = '#fef2f2'}
+          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <span style={{ fontSize: 16 }}>🚪</span>
           {!collapsed && <span>{t.logout}</span>}
         </button>
       </div>
@@ -3818,18 +3797,29 @@ function SubscriptionWarningBanner({ daysLeft, onRenew, language }) {
   const isRtl = language === 'ar';
 
   return (
-    <div className="bg-[#fbbf24] text-black text-center py-2.5 px-6 text-xs font-black uppercase tracking-widest flex items-center justify-between border-b border-yellow-600/30 shrink-0 z-[100] animate-pulse">
-      <div className="flex items-center gap-2 mx-auto">
+    <div
+      className="shrink-0 z-[100] flex items-center justify-between px-5 py-3 text-xs font-bold"
+      style={{
+        background: '#fffbeb',
+        borderBottom: '1px solid #fde68a',
+        borderLeft: '4px solid #d97706',
+        color: '#92400e',
+      }}
+    >
+      <div className="flex items-center gap-2">
         <span>⚠️</span>
-        <span className="font-extrabold">
-          {isRtl 
-            ? `ينتهي تجريبك في خلال ${daysLeft} أيام. جدد الآن!`
-            : `Your trial expires in ${daysLeft} days. Renew now!`}
+        <span className="font-bold">
+          {isRtl
+            ? `ينتهي اشتراكك التجريبي خلال ${daysLeft} أيام. جدد الآن لتجنب انقطاع الخدمة!`
+            : `Your trial expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}. Renew now to avoid interruption!`}
         </span>
       </div>
-      <button 
+      <button
         onClick={onRenew}
-        className="bg-black text-[#fbbf24] hover:bg-zinc-900 hover:text-white px-4 py-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-black/20"
+        className="px-4 py-1.5 font-black text-xs uppercase tracking-widest rounded-lg transition-all"
+        style={{ background: '#1e40af', color: '#fff', flexShrink: 0, marginLeft: 12 }}
+        onMouseOver={e => e.currentTarget.style.background = '#1e3a8a'}
+        onMouseOut={e => e.currentTarget.style.background = '#1e40af'}
       >
         {isRtl ? 'تجديد' : 'Renew'}
       </button>
@@ -6412,7 +6402,7 @@ export default function App() {
     }, [daysLeft]);
 
     return (
-      <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="flex h-screen w-screen transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
         
         {/* Offline Warning Banner */}
         {!isOnline && (
@@ -6434,7 +6424,7 @@ export default function App() {
           activeBranchName={activeBranchName}
         />
 
-        <main className="flex-1 flex flex-col min-h-0 text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative bg-white dark:bg-[#0a0a0c] border-zinc-200 dark:border-[#D4AF37]/20">
+        <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
           <SubscriptionWarningBanner
             daysLeft={daysLeft}
             onRenew={() => {
@@ -6445,28 +6435,30 @@ export default function App() {
           />
           
           {/* Header */}
-          <div className="flex justify-between items-center bg-[var(--bg-sidebar)] border-b border-[var(--border-color)] px-6 h-16 shrink-0 z-10 relative">
-            <div className="flex items-center gap-3">
-              <div className="w-1 h-6 bg-[#0066FF]" />
-              <h1 className="text-lg font-black text-[var(--text-primary)] uppercase tracking-widest">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', padding: '0 24px', height: 60, flexShrink: 0, zIndex: 10, position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 3, height: 20, background: 'var(--accent-blue)', borderRadius: 99 }} />
+              <h1 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '0.2px' }}>
                 {T[language][activeTab] || activeTab}
               </h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {activeBranchName && (
-                <div className="flex items-center gap-2 bg-[#0a0a0a] border border-[#0066FF]/40 px-4 py-1.5">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue-light)', padding: '5px 12px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
                   <span style={{ fontSize: 12 }}>🏢</span>
-                  <span className="text-[10px] font-black text-[#0066FF] uppercase tracking-widest">{activeBranchName}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>{activeBranchName}</span>
                 </div>
               )}
               {branchId && (
-                <button 
+                <button
                   onClick={handleManualSync}
                   disabled={isSyncing}
-                  className="flex items-center justify-center bg-[#1a1a1a] border border-[#333] hover:border-[#0066FF] w-8 h-8 transition-colors disabled:opacity-50 group"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'var(--bg-deep)', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', opacity: isSyncing ? 0.6 : 1 }}
                   title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                  onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent-blue)'; e.currentTarget.style.background = 'var(--accent-blue-light)'; }}
+                  onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'var(--bg-deep)'; }}
                 >
-                  <svg className={`w-4 h-4 text-[#888] group-hover:text-[#0066FF] ${isSyncing ? 'animate-spin text-[#0066FF]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={{ color: isSyncing ? 'var(--accent-blue)' : 'var(--text-secondary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                     <path d="M3 3v5h5" />
                     <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
@@ -6475,15 +6467,15 @@ export default function App() {
                 </button>
               )}
               {activeShift && (
-                <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#D4AF37] px-4 py-1.5">
-                  <span className="w-2 h-2 bg-[#D4AF37] animate-pulse rounded-full" />
-                  <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Live Session</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0fdf4', padding: '5px 12px', borderRadius: 20, border: '1px solid #bbf7d0' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>{isRtl ? 'وردية نشطة' : 'Live Session'}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 border-zinc-200 dark:border-[#D4AF37]/20 transition-colors duration-200">
+          <div className="flex-1 overflow-y-auto transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }}>
             {renderTabContent()}
           </div>
         </main>
@@ -6497,23 +6489,36 @@ export default function App() {
   };
 
   const AuthGateway = () => {
-    // 1. If not logged in -> CombinedAuthScreen
+    // Landing page state — starts true (show marketing page first)
+    const [showAuth, setShowAuth] = useState(false);
+
+    // 1. If not logged in -> Landing Page or Auth Form
     if (!currentUser) {
       return (
-        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div dir={isRtl ? 'rtl' : 'ltr'} style={{ position: 'relative' }}>
           {!isOnline && (
-            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+            <div className="fixed top-0 left-0 right-0 z-[9999] text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse" style={{ background: '#d97706' }}>
+              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت' : 'No Internet Connection — Data will not sync until reconnected'}
             </div>
           )}
-          <CombinedAuthScreen 
-            onLogin={handleLogin} 
-            onSignUp={handleSignUp}
-            language={language} 
-            setLanguage={setLanguage} 
-            users={users} 
-            onUpdateUser={handleUpdateUser} 
-          />
+
+          {!showAuth ? (
+            <LandingPage
+              language={language}
+              setLanguage={setLanguage}
+              onLogin={() => setShowAuth(true)}
+              onGetStarted={() => setShowAuth(true)}
+            />
+          ) : (
+            <CombinedAuthScreen
+              onLogin={handleLogin}
+              onSignUp={handleSignUp}
+              language={language}
+              setLanguage={setLanguage}
+              users={users}
+              onUpdateUser={handleUpdateUser}
+            />
+          )}
           <NotificationOverlay
             notifications={notifications}
             onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
@@ -6523,25 +6528,18 @@ export default function App() {
     }
 
     // 2. If logged in, check subscriptionStatus
+    const offlineBanner = !isOnline && (
+      <div className="fixed top-0 left-0 right-0 z-[9999] text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse" style={{ background: '#d97706' }}>
+        ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت' : 'No Internet Connection — Data will not sync until reconnected'}
+      </div>
+    );
+
     if (subscriptionStatus === 'pending_onboarding') {
       return (
-        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
-          {!isOnline && (
-            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
-            </div>
-          )}
-          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
-            <SubscriptionSelectionScreen
-              onSelectPlan={handleSelectSubscriptionPlan}
-              onLogout={handleLogout}
-              language={language}
-            />
-          </main>
-          <NotificationOverlay
-            notifications={notifications}
-            onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
-          />
+        <div style={{ minHeight: '100vh' }} dir={isRtl ? 'rtl' : 'ltr'}>
+          {offlineBanner}
+          <SubscriptionSelectionScreen onSelectPlan={handleSelectSubscriptionPlan} onLogout={handleLogout} language={language} />
+          <NotificationOverlay notifications={notifications} onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))} />
         </div>
       );
     }
@@ -6550,23 +6548,10 @@ export default function App() {
     const isSubscriptionActive = !subscriptionExpired && (subscriptionStatus === 'active' || subscriptionStatus === 'trial');
     if (!isSubscriptionActive) {
       return (
-        <div className="flex h-screen w-screen bg-slate-100 text-slate-900 dark:bg-[#0a0a0c] dark:text-zinc-100 transition-colors duration-200" dir={isRtl ? 'rtl' : 'ltr'}>
-          {!isOnline && (
-            <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-              ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
-            </div>
-          )}
-          <main className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0a0a0c] text-slate-900 dark:text-zinc-100 transition-colors duration-200 relative">
-            <SubscriptionSelectionScreen
-              onSelectPlan={handleSelectSubscriptionPlan}
-              onLogout={handleLogout}
-              language={language}
-            />
-          </main>
-          <NotificationOverlay
-            notifications={notifications}
-            onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
-          />
+        <div style={{ minHeight: '100vh' }} dir={isRtl ? 'rtl' : 'ltr'}>
+          {offlineBanner}
+          <SubscriptionSelectionScreen onSelectPlan={handleSelectSubscriptionPlan} onLogout={handleLogout} language={language} />
+          <NotificationOverlay notifications={notifications} onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))} />
         </div>
       );
     }

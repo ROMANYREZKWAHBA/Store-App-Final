@@ -1,69 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Inter:wght@400;600;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-/* استخدام @import بدل @tailwind لحل مشكلة الـ Build في Vercel */
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* ================================================================
+   ENTERPRISE LIGHT THEME — StorePilot PRO (Daftra-Style)
+   Default: Light. Dark mode toggled via [data-theme="dark"].
+================================================================= */
+
 :root {
-  --bg-deep: #000000;
-  --bg-card: #111111;
-  --bg-sidebar: #050505;
-  --bg-header: #0a0a0a;
-  --border-color: #222222;
-  --accent-purple: #8120FF;
-  --accent-gold: #D4AF37;
-  --text-primary: #FFFFFF;
-  --text-secondary: #AAAAAA;
-  --text-muted: #555555;
-  
+  /* ── Core Backgrounds */
+  --bg-deep:    #f8fafc;
+  --bg-card:    #ffffff;
+  --bg-sidebar: #ffffff;
+  --bg-header:  #ffffff;
+
+  /* ── Borders */
+  --border-color: #e2e8f0;
+
+  /* ── Brand Colors */
+  --accent-blue:   #1e40af;
+  --accent-blue-hover: #1e3a8a;
+  --accent-blue-light: #eff6ff;
+  --accent-gold:   #eab308;
+  --accent-gold-muted: #fef9c3;
+
+  /* Backwards-compat alias */
+  --accent-purple: #1e40af;
+
+  /* ── Typography */
+  --text-primary:   #1e293b;
+  --text-secondary: #64748b;
+  --text-muted:     #94a3b8;
+
+  /* ── Fonts */
   --font-ar: 'Cairo', sans-serif;
   --font-en: 'Inter', sans-serif;
+
+  /* ── Sidebar active state */
+  --sidebar-active-bg:   #eff6ff;
+  --sidebar-active-text: #1e40af;
+  --sidebar-active-border: #1e40af;
 }
 
-[data-theme="light"] {
-  --bg-deep: #F8FAFC;
-  --bg-card: #FFFFFF;
-  --bg-sidebar: #0F172A; 
-  --bg-header: #FFFFFF;
-  --border-color: #E2E8F0;
+/* ── Dark Mode Override (persisted via pos_theme=dark) */
+[data-theme="dark"] {
+  --bg-deep:    #0a0a0c;
+  --bg-card:    #111114;
+  --bg-sidebar: #050507;
+  --bg-header:  #0d0d10;
+  --border-color: #1e1e24;
+  --accent-blue:   #3b82f6;
+  --accent-blue-light: #1e3a8a20;
+  --accent-gold:   #D4AF37;
+  --accent-gold-muted: #D4AF3715;
   --accent-purple: #8120FF;
-  --accent-gold: #B48A00; 
-  --text-primary: #1E293B;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+  --sidebar-active-bg:   #1e3a8a30;
+  --sidebar-active-text: #60a5fa;
+  --sidebar-active-border: #3b82f6;
 }
 
+/* ================================================================
+   BODY BASE
+================================================================= */
 body {
   margin: 0;
   background-color: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-en);
+  -webkit-font-smoothing: antialiased;
 }
 
 body[dir="rtl"] {
   font-family: var(--font-ar);
-}
-
-/* Base styles for the sharp edges, excluding modern login UI elements */
-*:not(.login-rounded, .login-rounded *) {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-deep);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
 }
 
 #root {
@@ -72,15 +85,95 @@ body[dir="rtl"] {
   flex-direction: column;
 }
 
-/* Bloomberg-like highlight */
-.bloomberg-border {
-  border-left: 4px solid var(--accent-purple);
+/* ================================================================
+   HYBRID BORDER-RADIUS STRATEGY
+   ──────────────────────────────
+   Internal transactional UIs (POS, tables, inventory) keep the
+   sharp-edge industrial look for data density.
+   Public-facing enterprise UIs (landing, auth, subscription) get
+   modern rounded corners via the `.enterprise-ui` wrapper.
+================================================================= */
+
+/* GLOBAL sharp-edge rule — applied to all internal screens */
+*:not(.enterprise-ui, .enterprise-ui *, .login-rounded, .login-rounded *) {
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
-.gold-text {
-  color: var(--accent-gold);
+/* Enterprise UI surfaces — allow Tailwind rounded-* classes */
+.enterprise-ui,
+.enterprise-ui * {
+  /* No forced override — Tailwind rounded-* classes apply naturally */
 }
 
-.purple-bg {
-  background-color: var(--accent-purple);
+/* ================================================================
+   ENTERPRISE COMPONENT UTILITIES
+================================================================= */
+
+/* Card */
+.e-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
 }
+
+/* Input */
+.e-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.e-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* Primary Button */
+.e-btn-primary {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 24px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.25);
+}
+.e-btn-primary:hover {
+  background: var(--accent-blue-hover);
+  box-shadow: 0 4px 16px rgba(30, 64, 175, 0.35);
+  transform: translateY(-1px);
+}
+.e-btn-primary:disabled {
+  opacity: 0.45;
+  transform: none;
+}
+
+/* ================================================================
+   SCROLLBAR — Enterprise Light
+================================================================= */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ================================================================
+   LEGACY UTILITY CLASSES (backwards compat)
+================================================================= */
+.bloomberg-border { border-left: 4px solid var(--accent-blue); }
+.gold-text        { color: var(--accent-gold); }
+.purple-bg        { background-color: var(--accent-blue); }
