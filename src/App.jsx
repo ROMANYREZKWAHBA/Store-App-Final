@@ -5597,36 +5597,42 @@ export default function App() {
   // Handles /admin-master-u4 (secret developer route) and /signup?inviteToken=...
   // =========================================================================
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const [inviteContext, setInviteContext] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('inviteToken');
-    const storeId = params.get('storeId');
-    const role = params.get('role');
-    const storeName = params.get('storeName');
-    if (token === 'true' && storeId && role) {
-      return { storeId, role, storeName: storeName ? decodeURIComponent(storeName) : '' };
-    }
-    return null;
-  });
+  const [inviteContext, setInviteContext] = useState(null);
 
   useEffect(() => {
-    const handlePopState = () => {
-      setCurrentPath(window.location.pathname);
-      // Re-parse invite params on navigation
+    const parseParams = () => {
       const params = new URLSearchParams(window.location.search);
       const token = params.get('inviteToken');
       const storeId = params.get('storeId');
       const role = params.get('role');
       const storeName = params.get('storeName');
+      
       if (token === 'true' && storeId && role) {
-        setInviteContext({ storeId, role, storeName: storeName ? decodeURIComponent(storeName) : '' });
+        const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
+        setInviteContext(prev => {
+          if (prev && prev.storeId === storeId && prev.role === role && prev.storeName === decodedStoreName) {
+            return prev;
+          }
+          return { storeId, role, storeName: decodedStoreName };
+        });
       } else {
-        // Only clear inviteContext if we navigated away from invite URL
-        if (window.location.search.indexOf('inviteToken') === -1) {
-          setInviteContext(null);
-        }
+        setInviteContext(prev => {
+          if (window.location.search.indexOf('inviteToken') === -1) {
+            return prev !== null ? null : prev;
+          }
+          return prev;
+        });
       }
     };
+
+    // Run on mount
+    parseParams();
+
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+      parseParams();
+    };
+
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
