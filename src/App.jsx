@@ -3594,7 +3594,9 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef(null);
   const handleLogoClick = () => {
-    if (!currentUser || currentUser.id !== 'u_4') return;
+    if (!currentUser) return;
+    const isDev = currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
+    if (!isDev) return;
     logoClickCount.current += 1;
     if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
     if (logoClickCount.current >= 5) {
@@ -3668,7 +3670,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         {!collapsed && (
           <div
             onClick={handleLogoClick}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', cursor: currentUser?.id === 'u_4' ? 'pointer' : 'default', userSelect: 'none' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', cursor: (currentUser?.id === 'u_4' || localStorage.getItem('dev_override') === 'true') ? 'pointer' : 'default', userSelect: 'none' }}
           >
             <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>🚀</div>
             <div style={{ overflow: 'hidden' }}>
@@ -3680,7 +3682,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         {collapsed && (
           <div
             onClick={handleLogoClick}
-            style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: currentUser?.id === 'u_4' ? 'pointer' : 'default', userSelect: 'none' }}
+            style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: (currentUser?.id === 'u_4' || localStorage.getItem('dev_override') === 'true') ? 'pointer' : 'default', userSelect: 'none' }}
           >🚀</div>
         )}
         <button
@@ -6304,6 +6306,7 @@ export default function App() {
           }
         }
         setCurrentUser(cloudUser);
+        console.log("=== YOUR REAL USER ID ===", cloudUser.id);
         // Bind session to user's assigned branch
         if (cloudUser.assignedBranchId && cloudUser.role !== 'Owner') {
           setBranchId(cloudUser.assignedBranchId);
@@ -6347,6 +6350,7 @@ export default function App() {
         }
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
+        console.log("=== YOUR REAL USER ID ===", found.id);
         if (found.assignedBranchId && found.role !== 'Owner') {
           setBranchId(found.assignedBranchId);
           setActiveBranchName(found.assignedBranchName || '');
@@ -6760,7 +6764,8 @@ export default function App() {
     // SECRET ROUTE: /admin-master-u4
     // -----------------------------------------------------------------------
     if (currentPath === '/admin-master-u4') {
-      if (currentUser && currentUser.id === 'u_4') {
+      const isDev = currentUser && (currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true');
+      if (isDev) {
         return (
           <div className="enterprise-ui min-h-screen" style={{ background: '#f8fafc' }} dir={isRtl ? 'rtl' : 'ltr'}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
