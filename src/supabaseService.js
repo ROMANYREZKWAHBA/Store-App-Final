@@ -287,14 +287,13 @@ export async function verifyPinLogin(pin) {
  * Returns the matched user with relational branch data, or null.
  * Throws an error string if the assigned branch is deactivated.
  */
-export async function verifyCredentialsLogin(username, password, role) {
+export async function verifyCredentialsLogin(username, password) {
   // Step 1: Find the user by credentials globally (no branch_id filter)
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('username', username)
     .eq('password', password)
-    .eq('role', role)
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();
@@ -306,8 +305,7 @@ export async function verifyCredentialsLogin(username, password, role) {
       details: error.details,
       hint: error.hint,
       status: error.status,
-      username,
-      role
+      username
     });
     if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
       throw new Error('TABLE_MISSING');

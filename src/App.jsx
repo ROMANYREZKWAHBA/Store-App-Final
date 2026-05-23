@@ -3093,21 +3093,10 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
   const [signUpUsername, setSignUpUsername] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
 
-  // Focus-activated keypad state
-  const [isKeypadVisible, setIsKeypadVisible] = useState(false);
-
-  const handlePin = async () => {
-    setIsLoggingIn(true);
-    setError(null);
-    const err = await onLogin(pin, undefined, 'Cashier');
-    if (err) setError(err);
-    setIsLoggingIn(false);
-  };
-
   const handleCredentials = async () => {
     setIsLoggingIn(true);
     setError(null);
-    const err = await onLogin(username, password, selectedRole);
+    const err = await onLogin(username, password);
     if (err) setError(err);
     setIsLoggingIn(false);
   };
@@ -3193,19 +3182,10 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
     }
   };
 
-  const handlePinChange = (e) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    if (value.length <= 6) {
-      setPin(value);
-    }
-  };
-
   useEffect(() => {
     setError(null);
-    setPin('');
     setUsername('');
     setPassword('');
-    setIsKeypadVisible(false);
     setSignUpStoreName('');
     setSignUpName('');
     setSignUpUsername('');
@@ -3312,94 +3292,25 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 
           {authMode === 'login' ? (
             <div key="login" className="space-y-5 slide-fade">
-              {/* Role Selector Tabs */}
-              <div className="flex p-1 rounded-xl" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
-                {['Cashier', 'Admin', 'Owner'].map(role => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => setSelectedRole(role)}
-                    className="flex-1 py-2.5 font-black text-xs uppercase tracking-widest rounded-lg transition-all duration-200"
-                    style={{
-                      background: selectedRole === role ? '#1e40af' : 'transparent',
-                      color: selectedRole === role ? '#ffffff' : '#64748b',
-                      boxShadow: selectedRole === role ? '0 2px 8px rgba(30,64,175,0.25)' : 'none',
-                    }}
-                  >
-                    {role}
-                  </button>
-                ))}
+              {/* Unified Sign In Form */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم أو البريد الإلكتروني' : 'Username or Email'}</label>
+                  <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Enter username...'} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="e-input" placeholder="••••••••" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCredentials}
+                  disabled={isLoggingIn || !username.trim() || !password.trim()}
+                  className="e-btn-primary w-full py-3.5 rounded-xl text-sm mt-2"
+                >
+                  {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول' : 'Sign In')}
+                </button>
               </div>
-
-              {selectedRole === 'Cashier' ? (
-                <div className="space-y-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'رمز الدخول (PIN)' : 'Passcode (PIN)'}</label>
-                    <input
-                      type="password"
-                      value={pin}
-                      onChange={handlePinChange}
-                      onFocus={() => setIsKeypadVisible(true)}
-                      onBlur={() => setTimeout(() => setIsKeypadVisible(false), 200)}
-                      placeholder="••••••"
-                      maxLength={6}
-                      className="e-input text-center text-xl tracking-[0.5em]"
-                    />
-                  </div>
-
-                  {/* PIN Keypad */}
-                  {isKeypadVisible && (
-                    <div className="grid grid-cols-3 gap-2 slide-fade">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'CLR', 0, '⌫'].map(btn => (
-                        <button
-                          key={btn}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            if (btn === 'CLR') setPin('');
-                            else if (btn === '⌫') setPin(p => p.slice(0, -1));
-                            else if (pin.length < 6) setPin(p => p + String(btn));
-                          }}
-                          className="h-11 font-black text-sm rounded-lg transition-all"
-                          style={{ background: '#f1f5f9', color: '#1e293b', border: '1px solid #e2e8f0' }}
-                          onMouseOver={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#1e40af'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
-                          onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#1e293b'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-                        >
-                          {btn}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handlePin}
-                    disabled={pin.length < 4 || isLoggingIn}
-                    className="e-btn-primary w-full py-3.5 rounded-xl text-sm"
-                  >
-                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول' : 'Sign In')}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
-                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Enter username...'} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="e-input" placeholder="••••••••" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCredentials}
-                    disabled={isLoggingIn}
-                    className="e-btn-primary w-full py-3.5 rounded-xl text-sm mt-2"
-                  >
-                    {isLoggingIn ? (isRtl ? 'جاري التحقق...' : 'Verifying...') : (isRtl ? 'دخول' : 'Sign In')}
-                  </button>
-                </div>
-              )}
 
               <button onClick={handleRecovery} className="w-full text-xs font-bold text-[#64748b] hover:text-[#1e40af] transition-all mt-2">
                 {isRtl ? 'نسيت بيانات الدخول؟' : 'Forgot credentials?'}
@@ -6340,16 +6251,12 @@ export default function App() {
     }
   };
 
-  const handleLogin = async (id, pwd, role) => {
+  const handleLogin = async (id, pwd) => {
     try {
       // Step 1: Try Supabase cross-branch auth (cloud-first)
       let cloudUser = null;
       try {
-        if (role === 'Cashier') {
-          cloudUser = await SB.verifyPinLogin(id);
-        } else {
-          cloudUser = await SB.verifyCredentialsLogin(id, pwd, role);
-        }
+        cloudUser = await SB.verifyCredentialsLogin(id, pwd);
       } catch (authErr) {
         if (authErr.message === 'BRANCH_DEACTIVATED') {
           return isRtl ? 'الفرع التابع له معطّل حالياً' : 'Your assigned branch is currently deactivated';
@@ -6363,7 +6270,7 @@ export default function App() {
           status: authErr.status
         });
       }
-      console.log('☁️ Cloud Auth Response for PIN:', id, '->', cloudUser);
+      console.log('☁️ Cloud Auth Response for:', id, '->', cloudUser);
 
       // Step 2: If cloud returned a match, use it
       if (cloudUser) {
@@ -6411,11 +6318,11 @@ export default function App() {
       }
 
       // Step 3: Fallback to local user array (offline mode)
-      let found = users.find(u => u.role === role && (role === 'Cashier' ? String(u.pin) === String(id) : (u.username === id && u.password === pwd)));
+      let found = users.find(u => u.username === id && u.password === pwd);
       
       // Step 3.5: Hard Fallback to structural DEFAULT_USERS if Incognito/Schema error blocked user load
       if (!found) {
-        found = DEFAULT_USERS.find(u => u.role === role && (role === 'Cashier' ? String(u.pin) === String(id) : (u.username === id && u.password === pwd)));
+        found = DEFAULT_USERS.find(u => u.username === id && u.password === pwd);
       }
       
       if (found && found.isActive) {
