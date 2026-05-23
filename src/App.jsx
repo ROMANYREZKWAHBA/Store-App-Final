@@ -3066,8 +3066,9 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
 // ============================================================
 // COMBINED AUTH SCREEN (SIGN IN / SIGN UP)
 // ============================================================
-function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, onUpdateUser }) {
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, onUpdateUser, inviteContext }) {
+  // Default to 'signup' when coming from an invitation link
+  const [authMode, setAuthMode] = useState(() => inviteContext ? 'signup' : 'login');
   const [selectedRole, setSelectedRole] = useState('Cashier');
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
@@ -3112,13 +3113,19 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
   };
 
   const handleSignUpSubmit = async () => {
-    if (!signUpStoreName.trim() || !signUpName.trim() || !signUpUsername.trim() || !signUpPassword.trim()) {
+    // If coming via invite, Store Name is not required
+    if (!inviteContext && !signUpStoreName.trim()) {
+      setError(isRtl ? 'جميع الحقول مطلوبة' : 'All fields are required');
+      return;
+    }
+    if (!signUpName.trim() || !signUpUsername.trim() || !signUpPassword.trim()) {
       setError(isRtl ? 'جميع الحقول مطلوبة' : 'All fields are required');
       return;
     }
     setIsRegistering(true);
     setError(null);
-    const err = await onSignUp(signUpName.trim(), signUpUsername.trim(), signUpPassword.trim(), signUpStoreName.trim());
+    // Pass inviteContext as 5th arg so handleSignUp can branch appropriately
+    const err = await onSignUp(signUpName.trim(), signUpUsername.trim(), signUpPassword.trim(), signUpStoreName.trim(), inviteContext || null);
     if (err) setError(err);
     setIsRegistering(false);
   };
@@ -3400,10 +3407,35 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
             </div>
           ) : (
             <div key="signup" className="space-y-4 slide-fade">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المتجر' : 'Store Name'}</label>
-                <input type="text" value={signUpStoreName} onChange={e => setSignUpStoreName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم متجرك...' : 'Your store name...'} />
-              </div>
+
+              {/* Invitation Badge — shown only when arriving via invite link */}
+              {inviteContext && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>🏪</span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: '#1e40af' }}>
+                      {isRtl ? 'دعوة للانضمام كموظف' : 'Staff Invitation'}
+                    </p>
+                    {inviteContext.storeName && (
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>
+                        {isRtl ? `المتجر: ${inviteContext.storeName}` : `Store: ${inviteContext.storeName}`}
+                      </p>
+                    )}
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
+                      {isRtl ? `الدور: ${inviteContext.role}` : `Role: ${inviteContext.role}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Store Name — hidden when signing up via invite */}
+              {!inviteContext && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المتجر' : 'Store Name'}</label>
+                  <input type="text" value={signUpStoreName} onChange={e => setSignUpStoreName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم متجرك...' : 'Your store name...'} />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'الاسم الكامل' : 'Full Name'}</label>
                 <input type="text" value={signUpName} onChange={e => setSignUpName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسمك الكامل...' : 'Your full name...'} />
@@ -3422,11 +3454,18 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                 disabled={isRegistering}
                 className="e-btn-primary w-full py-3.5 rounded-xl text-sm mt-2"
               >
-                {isRegistering ? (isRtl ? 'جاري إنشاء الحساب...' : 'Creating account...') : (isRtl ? '🚀 بدء التجربة المجانية 7 أيام' : '🚀 Start 7-Day Free Trial')}
+                {isRegistering
+                  ? (isRtl ? 'جاري إنشاء الحساب...' : 'Creating account...')
+                  : inviteContext
+                    ? (isRtl ? '✓ قبول الدعوة والانضمام' : '✓ Accept Invitation & Join')
+                    : (isRtl ? '🚀 بدء التجربة المجانية 7 أيام' : '🚀 Start 7-Day Free Trial')
+                }
               </button>
-              <p className="text-center text-xs text-[#94a3b8] font-medium">
-                {isRtl ? 'لا توجد رسوم، لا بطاقة ائتمان مطلوبة.' : 'No charge. No credit card required.'}
-              </p>
+              {!inviteContext && (
+                <p className="text-center text-xs text-[#94a3b8] font-medium">
+                  {isRtl ? 'لا توجد رسوم، لا بطاقة ائتمان مطلوبة.' : 'No charge. No credit card required.'}
+                </p>
+              )}
             </div>
           )}
 
@@ -3547,34 +3586,25 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 // ============================================================
 function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName }) {
   const currentUser = user;
-  if (currentUser) {
-    console.log("Current User Role: " + currentUser.role);
-    if (currentUser.id === 'u_4') {
-      if (currentUser.role !== 'admin') {
-        currentUser.role = 'admin';
-      }
-      try {
-        const localUsersStr = localStorage.getItem('pos_users');
-        const localUsers = localUsersStr ? JSON.parse(localUsersStr) : DEFAULT_USERS;
-        let updated = false;
-        const newUsers = localUsers.map(u => {
-          if (u.id === 'u_4' && u.role !== 'admin') {
-            updated = true;
-            return { ...u, role: 'admin' };
-          }
-          return u;
-        });
-        if (updated || !localUsersStr) {
-          localStorage.setItem('pos_users', JSON.stringify(newUsers));
-        }
-      } catch (e) {
-        console.error('Error fixing admin user in localStorage:', e);
-      }
-    }
-  }
 
   const t = T[language];
   const isRtl = language === 'ar';
+
+  // Secret logo click counter for u_4 developer access
+  const logoClickCount = useRef(0);
+  const logoClickTimer = useRef(null);
+  const handleLogoClick = () => {
+    if (!currentUser || currentUser.id !== 'u_4') return;
+    logoClickCount.current += 1;
+    if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
+    if (logoClickCount.current >= 5) {
+      logoClickCount.current = 0;
+      window.history.pushState({}, '', '/admin-master-u4');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } else {
+      logoClickTimer.current = setTimeout(() => { logoClickCount.current = 0; }, 1500);
+    }
+  };
 
   const groups = [
     {
@@ -3610,8 +3640,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'reports', label: t.reports, icon: '📈' },
         { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
-        // Master Admin Panel is exclusively visible to the System Developer (u_4)
-        ...(user?.id === 'u_4' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة التحكم العامة للمسؤول' : 'Master Admin Panel', icon: '🛡️' }] : []),
+        // Master Admin Panel is intentionally HIDDEN from all navigation menus.
+        // Access is granted exclusively via: 5 rapid logo clicks (u_4 only) OR the /admin-master-u4 URL.
       ]
     },
   ];
@@ -3633,10 +3663,13 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         overflow: 'hidden',
       }}
     >
-      {/* Logo Row */}
+      {/* Logo Row — clicking 5 times rapidly grants u_4 developer access */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: '20px 16px', borderBottom: '1px solid #e2e8f0', position: 'relative', flexShrink: 0 }}>
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+          <div
+            onClick={handleLogoClick}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', cursor: currentUser?.id === 'u_4' ? 'pointer' : 'default', userSelect: 'none' }}
+          >
             <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>🚀</div>
             <div style={{ overflow: 'hidden' }}>
               <p style={{ color: '#1e293b', fontWeight: 900, fontSize: 14, letterSpacing: '0.5px', margin: 0 }}>StorePilot</p>
@@ -3645,7 +3678,10 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
           </div>
         )}
         {collapsed && (
-          <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🚀</div>
+          <div
+            onClick={handleLogoClick}
+            style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: currentUser?.id === 'u_4' ? 'pointer' : 'default', userSelect: 'none' }}
+          >🚀</div>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -3859,6 +3895,43 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
   const [payAmount, setPayAmount] = useState('');
   const [payNote, setPayNote] = useState('');
   const [paymentSource, setPaymentSource] = useState('Drawer');
+
+  // Invite link generator state
+  const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
+
+  const generateInviteLink = () => {
+    if (!fName.trim() || !fRole) return;
+    const activeBranchIdForInvite = fBranchId || localStorage.getItem('active_branch_id') || '';
+    const activeStoreName = localStorage.getItem('storeName') || 'StorePilot';
+    const params = new URLSearchParams({
+      inviteToken: 'true',
+      storeId: activeBranchIdForInvite,
+      role: fRole,
+      storeName: activeStoreName,
+    });
+    const link = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    setGeneratedInviteLink(link);
+    setInviteLinkCopied(false);
+  };
+
+  const copyInviteLink = () => {
+    if (!generatedInviteLink) return;
+    navigator.clipboard.writeText(generatedInviteLink).then(() => {
+      setInviteLinkCopied(true);
+      setTimeout(() => setInviteLinkCopied(false), 3000);
+    }).catch(() => {
+      // Fallback for browsers that block clipboard
+      const ta = document.createElement('textarea');
+      ta.value = generatedInviteLink;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setInviteLinkCopied(true);
+      setTimeout(() => setInviteLinkCopied(false), 3000);
+    });
+  };
 
   const ROLES = ['Cashier', 'Admin', 'Manager', 'Accountant', 'Storekeeper'];
 
@@ -4240,6 +4313,45 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                   ))}
                 </div>
               </div>
+
+              {/* Invite Link Generator — available only on 'Add New' (not edit) */}
+              {!editingEmp && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, marginTop: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase" style={{ letterSpacing: 1 }}>
+                      🔗 {isRtl ? 'رابط الدعوة' : 'Invitation Link'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={generateInviteLink}
+                      disabled={!fName.trim() || !fRole}
+                      className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-none transition-all"
+                      style={{ background: '#1e40af', color: '#fff', opacity: (!fName.trim() || !fRole) ? 0.5 : 1, cursor: (!fName.trim() || !fRole) ? 'not-allowed' : 'pointer' }}
+                    >
+                      {isRtl ? 'توليد الرابط' : 'Generate Link'}
+                    </button>
+                  </div>
+                  {generatedInviteLink && (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: 10, color: '#15803d', fontWeight: 700, textTransform: 'uppercase' }}>
+                        {isRtl ? 'أرسل هذا الرابط للموظف:' : 'Send this link to the employee:'}
+                      </p>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <p style={{ margin: 0, fontSize: 10, color: '#166534', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>
+                          {generatedInviteLink}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={copyInviteLink}
+                          style={{ flexShrink: 0, padding: '6px 10px', background: inviteLinkCopied ? '#16a34a' : '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
+                        >
+                          {inviteLinkCopied ? (isRtl ? '✓ تم النسخ' : '✓ Copied!') : (isRtl ? 'نسخ' : 'Copy')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 py-4 bg-[var(--bg-deep)] text-slate-600 rounded-none font-black uppercase text-xs">{isRtl ? 'إلغاء' : 'Cancel'}</button>
@@ -5421,6 +5533,45 @@ const getInitialTrialDaysLeft = () => {
   const result = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
   return result.status === 'trial' ? result.daysLeft : null;
 };
+// ============================================================
+// 404 / NOT FOUND SCREEN
+// Rendered for unauthorized /admin-master-u4 access attempts
+// ============================================================
+function NotFoundScreen({ language, onGoHome }) {
+  const isRtl = language === 'ar';
+  return (
+    <div
+      className="enterprise-ui min-h-screen w-full flex items-center justify-center"
+      style={{ background: '#f8fafc', fontFamily: isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
+      <div style={{ textAlign: 'center', maxWidth: 420, padding: '48px 32px' }}>
+        <div style={{ width: 80, height: 80, background: '#fef2f2', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, margin: '0 auto 24px' }}>🔒</div>
+        <h1 style={{ fontSize: 72, fontWeight: 900, color: '#e2e8f0', margin: '0 0 8px', lineHeight: 1 }}>404</h1>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', margin: '0 0 12px' }}>
+          {isRtl ? 'غير مصرح — المسار محمي' : 'Unauthorized — Protected Route'}
+        </h2>
+        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 32, lineHeight: 1.6 }}>
+          {isRtl
+            ? 'هذه الصفحة محجوزة حصرياً لمطوّر النظام. لا يمكن الوصول إليها من هذا الحساب.'
+            : 'This page is exclusively reserved for the System Developer. Access is not permitted from this account.'}
+        </p>
+        <button
+          onClick={onGoHome}
+          style={{
+            background: '#1e40af', color: '#fff', border: 'none',
+            padding: '12px 28px', borderRadius: 10, fontSize: 13,
+            fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+          }}
+          onMouseOver={e => e.currentTarget.style.background = '#1d3d8f'}
+          onMouseOut={e => e.currentTarget.style.background = '#1e40af'}
+        >
+          {isRtl ? '← العودة للرئيسية' : '← Back to Dashboard'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   console.log("Lifecycle: App mounted, Status Check Started");
@@ -5443,6 +5594,45 @@ export default function App() {
     return true;
   });
   const subscriptionActive = !subscriptionExpired;
+
+  // =========================================================================
+  // URL-BASED ROUTING STATE
+  // Handles /admin-master-u4 (secret developer route) and /signup?inviteToken=...
+  // =========================================================================
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const [inviteContext, setInviteContext] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('inviteToken');
+    const storeId = params.get('storeId');
+    const role = params.get('role');
+    const storeName = params.get('storeName');
+    if (token === 'true' && storeId && role) {
+      return { storeId, role, storeName: storeName ? decodeURIComponent(storeName) : '' };
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+      // Re-parse invite params on navigation
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('inviteToken');
+      const storeId = params.get('storeId');
+      const role = params.get('role');
+      const storeName = params.get('storeName');
+      if (token === 'true' && storeId && role) {
+        setInviteContext({ storeId, role, storeName: storeName ? decodeURIComponent(storeName) : '' });
+      } else {
+        // Only clear inviteContext if we navigated away from invite URL
+        if (window.location.search.indexOf('inviteToken') === -1) {
+          setInviteContext(null);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('pos_theme', theme);
@@ -5841,10 +6031,108 @@ export default function App() {
     }
   }, []);
 
-  const handleSignUp = async (name, username, password, signUpStoreName) => {
+  const handleSignUp = async (name, username, password, signUpStoreName, inviteCtx) => {
     try {
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
-      // New subscribers are store Owners, NOT the global system developer/admin
+
+      // -----------------------------------------------------------------------
+      // BRANCH A: Staff Invite — bypass store creation, trial, & subscription gate
+      // -----------------------------------------------------------------------
+      if (inviteCtx && inviteCtx.storeId) {
+        const targetBranchId = inviteCtx.storeId;
+        const staffRole = inviteCtx.role || 'Cashier';
+
+        const newStaffUser = {
+          id: userId,
+          name: name,
+          username: username,
+          password: password,
+          pin: password,
+          role: staffRole,
+          isActive: true,
+          assignedBranchId: targetBranchId,
+          assignedBranchName: inviteCtx.storeName || '',
+        };
+
+        // Add to local users array
+        const updatedUsers = [...users, newStaffUser];
+        setUsers(updatedUsers);
+        localStorage.setItem('pos_users', JSON.stringify(updatedUsers));
+
+        // Also create a corresponding staff employee record locally
+        const empId = 'EMP-' + Date.now().toString(36).toUpperCase();
+        const newEmp = {
+          id: empId,
+          userId,
+          name: name,
+          role: staffRole,
+          salaryBase: 0,
+          paymentFrequency: 'MONTHLY',
+          username: username,
+          pin: password,
+          assignedBranchId: targetBranchId,
+          assignedBranchName: inviteCtx.storeName || '',
+          status: 'ACTIVE',
+          shiftStatus: 'OFF_SHIFT',
+          todaySales: 0,
+          performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 },
+        };
+        setStaffEmployees(prev => [...prev, newEmp]);
+
+        // Save to Supabase under the owner's branch
+        if (cloudReady) {
+          try {
+            await SB.saveUser(targetBranchId, newStaffUser);
+            await SB.saveJsonRow('staff_employees', targetBranchId, newEmp);
+          } catch (cloudErr) {
+            console.error('Cloud staff signup sync failed:', cloudErr);
+          }
+        }
+
+        // Fetch and inherit the owner's subscription settings
+        let inheritedStatus = 'trial';
+        if (cloudReady) {
+          try {
+            const ownerSettings = await SB.fetchSettings(targetBranchId);
+            if (ownerSettings) {
+              const saas = checkSubscriptionStatus(ownerSettings);
+              inheritedStatus = saas.status;
+              setSubscriptionStatus(saas.status);
+              setSubscriptionExpired(saas.expired || false);
+              setTrialDaysLeft(saas.status === 'trial' ? saas.daysLeft : null);
+              localStorage.setItem('pos_subscription_status', saas.status);
+            }
+          } catch (settingsErr) {
+            console.error('Failed to fetch owner settings:', settingsErr);
+          }
+        }
+
+        // Log in as the new staff member
+        setCurrentUser(newStaffUser);
+        setBranchId(targetBranchId);
+        setActiveBranchName(inviteCtx.storeName || '');
+        localStorage.setItem('active_branch_id', targetBranchId);
+        localStorage.setItem('active_branch_name', inviteCtx.storeName || '');
+
+        // Load the owner's branch data
+        await reloadBranchData(targetBranchId);
+
+        // Clear invite URL params after successful signup
+        window.history.replaceState({}, '', '/');
+
+        setActiveTab('dashboard');
+        pushNotification(
+          isRtl
+            ? `مرحباً ${name}! تم قبول الدعوة والانضمام إلى ${inviteCtx.storeName || 'المتجر'} كـ ${staffRole}.`
+            : `Welcome ${name}! You've joined ${inviteCtx.storeName || 'the store'} as ${staffRole}.`,
+          'success'
+        );
+        return null;
+      }
+
+      // -----------------------------------------------------------------------
+      // BRANCH B: Normal Owner Registration — create store + trigger trial gate
+      // -----------------------------------------------------------------------
       const newUser = {
         id: userId,
         name: name,
@@ -6363,30 +6651,6 @@ export default function App() {
   };
 
   const Dashboard = () => {
-    // Force-check Admin role
-    if (currentUser && currentUser.id === 'u_4') {
-      if (currentUser.role !== 'admin') {
-        currentUser.role = 'admin';
-      }
-      try {
-        const localUsersStr = localStorage.getItem('pos_users');
-        const localUsers = localUsersStr ? JSON.parse(localUsersStr) : DEFAULT_USERS;
-        let updated = false;
-        const newUsers = localUsers.map(u => {
-          if (u.id === 'u_4' && u.role !== 'admin') {
-            updated = true;
-            return { ...u, role: 'admin' };
-          }
-          return u;
-        });
-        if (updated || !localUsersStr) {
-          localStorage.setItem('pos_users', JSON.stringify(newUsers));
-        }
-      } catch (e) {
-        console.error('Error fixing admin user in localStorage:', e);
-      }
-    }
-
     const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
     const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
     const localSubEnd = localStorage.getItem('pos_subscription_end_date');
@@ -6489,8 +6753,55 @@ export default function App() {
   };
 
   const AuthGateway = () => {
-    // Landing page state — starts true (show marketing page first)
-    const [showAuth, setShowAuth] = useState(false);
+    // If invite context is present, skip landing page and go straight to signup
+    const [showAuth, setShowAuth] = useState(() => inviteContext !== null);
+
+    // -----------------------------------------------------------------------
+    // SECRET ROUTE: /admin-master-u4
+    // -----------------------------------------------------------------------
+    if (currentPath === '/admin-master-u4') {
+      if (currentUser && currentUser.id === 'u_4') {
+        return (
+          <div className="enterprise-ui min-h-screen" style={{ background: '#f8fafc' }} dir={isRtl ? 'rtl' : 'ltr'}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🛡️</div>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 900, fontSize: 13, color: '#1e293b' }}>Master Control Panel</p>
+                  <p style={{ margin: 0, fontSize: 10, color: '#64748b', fontWeight: 600 }}>Developer Access — u_4</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+                style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#64748b' }}
+              >
+                {isRtl ? '← خروج' : '← Exit'}
+              </button>
+            </div>
+            <AdminMasterPanel
+              users={users}
+              setUsers={setUsers}
+              currentUser={currentUser}
+              language={language}
+              subscriptionStatus={subscriptionStatus}
+              setSubscriptionStatus={setSubscriptionStatus}
+              setSubscriptionExpired={setSubscriptionExpired}
+              setTrialDaysLeft={setTrialDaysLeft}
+              storeName={storeName}
+              pushNotification={pushNotification}
+            />
+            <NotificationOverlay notifications={notifications} onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))} />
+          </div>
+        );
+      }
+      // Non-u_4 user or unauthenticated guest: render 404
+      return (
+        <NotFoundScreen
+          language={language}
+          onGoHome={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+        />
+      );
+    }
 
     // 1. If not logged in -> Landing Page or Auth Form
     if (!currentUser) {
@@ -6502,7 +6813,7 @@ export default function App() {
             </div>
           )}
 
-          {!showAuth ? (
+          {(!showAuth && !inviteContext) ? (
             <LandingPage
               language={language}
               setLanguage={setLanguage}
@@ -6517,6 +6828,7 @@ export default function App() {
               setLanguage={setLanguage}
               users={users}
               onUpdateUser={handleUpdateUser}
+              inviteContext={inviteContext}
             />
           )}
           <NotificationOverlay
