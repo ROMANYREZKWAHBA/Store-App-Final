@@ -3408,22 +3408,39 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
           ) : (
             <div key="signup" className="space-y-4 slide-fade">
 
-              {/* Invitation Badge — shown only when arriving via invite link */}
+              {/* Premium Luxury Invitation Badge — shown only when arriving via invite link */}
               {inviteContext && (
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>🏪</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: '#1e40af' }}>
-                      {isRtl ? 'دعوة للانضمام كموظف' : 'Staff Invitation'}
-                    </p>
-                    {inviteContext.storeName && (
-                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>
-                        {isRtl ? `المتجر: ${inviteContext.storeName}` : `Store: ${inviteContext.storeName}`}
+                <div style={{
+                  background: 'linear-gradient(135deg, #09090f 0%, #0f1121 100%)',
+                  border: '1px solid #D4AF37',
+                  borderRadius: 14,
+                  padding: '16px 18px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 0 40px rgba(212,175,55,0.08)',
+                }}>
+                  {/* Gold glow accent */}
+                  <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, background: 'radial-gradient(circle, rgba(212,175,55,0.2) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏪</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 9, fontWeight: 900, color: '#D4AF37', textTransform: 'uppercase', letterSpacing: '2px', background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', padding: '2px 7px', borderRadius: 4 }}>
+                          {isRtl ? '✦ دعوة رسمية ✦' : '✦ Official Invitation ✦'}
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: '#f1f5f9', letterSpacing: '0.2px' }}>
+                        {isRtl
+                          ? `دعوة للانضمام إلى ${inviteContext.storeName || 'المتجر'}`
+                          : `Invited to join ${inviteContext.storeName || 'the Store'}`}
                       </p>
-                    )}
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
-                      {isRtl ? `الدور: ${inviteContext.role}` : `Role: ${inviteContext.role}`}
-                    </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>{isRtl ? 'صلاحية الحساب:' : 'Account Role:'}</span>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)', padding: '1px 8px', borderRadius: 4 }}>
+                          {inviteContext.role || 'Staff'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -3584,8 +3601,34 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 // ============================================================
 // SIDEBAR
 // ============================================================
-function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName, theme }) {
   const currentUser = user;
+  const isDark = theme === 'dark';
+
+  // Sidebar-scoped color tokens — react to theme
+  const SB = {
+    bg:          isDark ? '#0c0c0f'  : '#ffffff',
+    border:      isDark ? '#1e1e24'  : '#e2e8f0',
+    userBg:      isDark ? '#141418'  : '#f8fafc',
+    userBorder:  isDark ? '#2a2a33'  : '#e2e8f0',
+    branchBg:    isDark ? '#1a1a22'  : '#eff6ff',
+    branchBorder:isDark ? '#2e2e3c'  : '#bfdbfe',
+    branchText:  isDark ? '#93c5fd'  : '#1e40af',
+    groupLabel:  isDark ? '#4b5563'  : '#94a3b8',
+    navText:     isDark ? '#94a3b8'  : '#64748b',
+    navActive:   isDark ? '#1e3a5f'  : '#eff6ff',
+    navActiveBorder: isDark ? '#3b82f6' : '#1e40af',
+    navActiveText:   isDark ? '#93c5fd' : '#1e40af',
+    navHover:    isDark ? '#16161b'  : '#f8fafc',
+    toggleBg:    isDark ? '#111115'  : '#ffffff',
+    toggleBorder:isDark ? '#2a2a33'  : '#e2e8f0',
+    footerBtn:   isDark ? '#94a3b8'  : '#64748b',
+    collapseBtn: isDark ? '#1e1e24'  : '#e2e8f0',
+    collapseBtnBg: isDark ? '#0c0c0f' : '#fff',
+    nameText:    isDark ? '#f1f5f9'  : '#1e293b',
+    roleBadge:   isDark ? '#3b82f6'  : '#1e40af',
+    logoSubText: isDark ? '#60a5fa'  : '#1e40af',
+  };
 
   const t = T[language];
   const isRtl = language === 'ar';
@@ -3654,19 +3697,19 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
     <aside
       style={{
         width: collapsed ? 72 : 256,
-        background: '#ffffff',
+        background: SB.bg,
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
-        transition: 'width 0.25s ease',
-        borderRight: isRtl ? 'none' : '1px solid #e2e8f0',
-        borderLeft: isRtl ? '1px solid #e2e8f0' : 'none',
+        transition: 'width 0.25s ease, background 0.2s ease',
+        borderRight: isRtl ? 'none' : `1px solid ${SB.border}`,
+        borderLeft: isRtl ? `1px solid ${SB.border}` : 'none',
         overflow: 'hidden',
       }}
     >
       {/* Logo Row — clicking 5 times rapidly grants u_4 developer access */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: '20px 16px', borderBottom: '1px solid #e2e8f0', position: 'relative', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: '20px 16px', borderBottom: `1px solid ${SB.border}`, position: 'relative', flexShrink: 0 }}>
         {!collapsed && (
           <div
             onClick={handleLogoClick}
@@ -3674,8 +3717,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
           >
             <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>🚀</div>
             <div style={{ overflow: 'hidden' }}>
-              <p style={{ color: '#1e293b', fontWeight: 900, fontSize: 14, letterSpacing: '0.5px', margin: 0 }}>StorePilot</p>
-              <p style={{ color: '#1e40af', fontWeight: 700, fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>PRO</p>
+              <p style={{ color: SB.nameText, fontWeight: 900, fontSize: 14, letterSpacing: '0.5px', margin: 0 }}>StorePilot</p>
+              <p style={{ color: SB.logoSubText, fontWeight: 700, fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>PRO</p>
             </div>
           </div>
         )}
@@ -3692,10 +3735,10 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
             top: '50%', transform: 'translateY(-50%)',
             [isRtl ? 'left' : 'right']: collapsed ? '-12px' : '10px',
             width: 22, height: 22,
-            background: '#fff',
-            border: '1.5px solid #e2e8f0',
+            background: SB.collapseBtnBg,
+            border: `1.5px solid ${SB.collapseBtn}`,
             borderRadius: '50%',
-            color: '#94a3b8',
+            color: SB.navText,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', zIndex: 60, fontSize: 11, fontWeight: 900,
           }}
@@ -3706,20 +3749,20 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
 
       {/* User Badge */}
       {!collapsed && (
-        <div style={{ margin: '12px 12px 4px', background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', flexShrink: 0 }}>
+        <div style={{ margin: '12px 12px 4px', background: SB.userBg, padding: '12px 14px', borderRadius: 10, border: `1px solid ${SB.userBorder}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 14, flexShrink: 0 }}>
               {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
             <div style={{ overflow: 'hidden', flex: 1 }}>
-              <p style={{ color: '#1e293b', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{user?.name || 'User'}</p>
-              <p style={{ color: '#1e40af', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>{user?.role}</p>
+              <p style={{ color: SB.nameText, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{user?.name || 'User'}</p>
+              <p style={{ color: SB.roleBadge, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>{user?.role}</p>
             </div>
           </div>
           {activeBranchName && (
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, background: '#eff6ff', padding: '5px 10px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, background: SB.branchBg, padding: '5px 10px', borderRadius: 6, border: `1px solid ${SB.branchBorder}` }}>
               <span style={{ fontSize: 11 }}>🏢</span>
-              <span style={{ color: '#1e40af', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeBranchName}</span>
+              <span style={{ color: SB.branchText, fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeBranchName}</span>
             </div>
           )}
         </div>
@@ -3730,7 +3773,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         {groups.map(group => (
           <div key={group.label} style={{ marginBottom: 16 }}>
             {!collapsed && (
-              <p style={{ color: '#94a3b8', fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', padding: '0 8px', marginBottom: 6, marginTop: 4 }}>{group.label}</p>
+              <p style={{ color: SB.groupLabel, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', padding: '0 8px', marginBottom: 6, marginTop: 4 }}>{group.label}</p>
             )}
             {group.items.map(tab => {
               const hasPerm = canAccess(user, tab.id, userPermissions);
@@ -3753,29 +3796,28 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
                     borderRadius: 8,
                     cursor: hasPerm ? 'pointer' : 'not-allowed',
                     transition: 'all 0.15s ease',
-                    background: isActive ? (isAdmin ? '#fef9c3' : '#eff6ff') : 'transparent',
+                    background: isActive ? (isAdmin ? (isDark ? '#2d2400' : '#fef9c3') : SB.navActive) : 'transparent',
                     opacity: hasPerm ? 1 : 0.3,
-                    borderRight: !isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : '#1e40af') : '3px solid transparent',
-                    borderLeft: isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : '#1e40af') : '3px solid transparent',
+                    borderRight: !isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : SB.navActiveBorder) : '3px solid transparent',
+                    borderLeft: isRtl && isActive ? '3px solid ' + (isAdmin ? '#eab308' : SB.navActiveBorder) : '3px solid transparent',
                   }}
-                  onMouseOver={e => { if (!isActive && hasPerm) { e.currentTarget.style.background = '#f8fafc'; } }}
+                  onMouseOver={e => { if (!isActive && hasPerm) { e.currentTarget.style.background = SB.navHover; } }}
                   onMouseOut={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; } }}
                 >
                   <span style={{ fontSize: 17, flexShrink: 0 }}>{tab.icon}</span>
                   {!collapsed && (
                     <span style={{
-                      color: isActive ? (isAdmin ? '#b45309' : '#1e40af') : '#64748b',
+                      color: isActive ? (isAdmin ? '#eab308' : SB.navActiveText) : SB.navText,
                       fontWeight: isActive ? 800 : 600,
                       fontSize: isRtl ? 13 : 12,
                       whiteSpace: 'nowrap',
-                      textTransform: isRtl ? 'none' : 'none',
                       letterSpacing: '0.2px',
                       flex: 1,
                       textAlign: isRtl ? 'right' : 'left',
                     }}>{tab.label}</span>
                   )}
                   {!collapsed && isActive && (
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isAdmin ? '#eab308' : '#1e40af', flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isAdmin ? '#eab308' : SB.navActiveBorder, flexShrink: 0 }} />
                   )}
                 </button>
               );
@@ -3785,11 +3827,11 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
       </nav>
 
       {/* Sidebar Footer */}
-      <div style={{ borderTop: '1px solid #e2e8f0', padding: '8px', flexShrink: 0 }}>
+      <div style={{ borderTop: `1px solid ${SB.border}`, padding: '8px', flexShrink: 0 }}>
         <button
           onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: collapsed ? '10px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#64748b', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', transition: 'all 0.15s' }}
-          onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: collapsed ? '10px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: SB.footerBtn, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', transition: 'all 0.15s' }}
+          onMouseOver={e => e.currentTarget.style.background = SB.navHover}
           onMouseOut={e => e.currentTarget.style.background = 'transparent'}
         >
           <span style={{ fontSize: 16 }}>🌐</span>
@@ -3798,7 +3840,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         <button
           onClick={() => { if (window.confirm(isRtl ? 'هل تريد تسجيل الخروج؟' : 'Logout?')) onLogout(); }}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: collapsed ? '10px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#ef4444', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', transition: 'all 0.15s' }}
-          onMouseOver={e => e.currentTarget.style.background = '#fef2f2'}
+          onMouseOver={e => e.currentTarget.style.background = isDark ? '#2d0e0e' : '#fef2f2'}
           onMouseOut={e => e.currentTarget.style.background = 'transparent'}
         >
           <span style={{ fontSize: 16 }}>🚪</span>
@@ -4316,40 +4358,82 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                 </div>
               </div>
 
-              {/* Invite Link Generator — available only on 'Add New' (not edit) */}
+              {/* Premium Invite Link Generator — available only on 'Add New' (not edit) */}
               {!editingEmp && (
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, marginTop: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase" style={{ letterSpacing: 1 }}>
-                      🔗 {isRtl ? 'رابط الدعوة' : 'Invitation Link'}
-                    </label>
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 18, marginTop: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>🔗</span>
+                      <label className="text-[10px] font-black text-[var(--text-muted)] uppercase" style={{ letterSpacing: 1.5 }}>
+                        {isRtl ? 'رابط الدعوة الخاص' : 'Private Invitation Link'}
+                      </label>
+                    </div>
                     <button
                       type="button"
                       onClick={generateInviteLink}
                       disabled={!fName.trim() || !fRole}
-                      className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-none transition-all"
-                      style={{ background: '#1e40af', color: '#fff', opacity: (!fName.trim() || !fRole) ? 0.5 : 1, cursor: (!fName.trim() || !fRole) ? 'not-allowed' : 'pointer' }}
+                      className="text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-none transition-all flex items-center gap-1.5"
+                      style={{
+                        background: (!fName.trim() || !fRole) ? '#1a1a1f' : 'linear-gradient(135deg, #1e40af, #2563eb)',
+                        color: (!fName.trim() || !fRole) ? '#555' : '#fff',
+                        border: '1px solid',
+                        borderColor: (!fName.trim() || !fRole) ? '#333' : '#3b82f6',
+                        cursor: (!fName.trim() || !fRole) ? 'not-allowed' : 'pointer',
+                      }}
                     >
+                      <span>⚡</span>
                       {isRtl ? 'توليد الرابط' : 'Generate Link'}
                     </button>
                   </div>
                   {generatedInviteLink && (
-                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
-                      <p style={{ margin: '0 0 6px', fontSize: 10, color: '#15803d', fontWeight: 700, textTransform: 'uppercase' }}>
-                        {isRtl ? 'أرسل هذا الرابط للموظف:' : 'Send this link to the employee:'}
+                    <div style={{ background: 'linear-gradient(135deg, #09090f, #0a1020)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 10, padding: '12px 14px', boxShadow: '0 0 20px rgba(212,175,55,0.05)' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: 9, color: '#D4AF37', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2 }}>
+                        {isRtl ? '✦ أرسل هذا الرابط للموظف ✦' : '✦ Send this link to the employee ✦'}
                       </p>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <p style={{ margin: 0, fontSize: 10, color: '#166534', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                        <div style={{ flex: 1, background: '#0f0f18', border: '1px solid #2a2a3c', borderRadius: 6, padding: '8px 10px', fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', wordBreak: 'break-all', lineHeight: 1.5 }}>
                           {generatedInviteLink}
-                        </p>
+                        </div>
                         <button
                           type="button"
                           onClick={copyInviteLink}
-                          style={{ flexShrink: 0, padding: '6px 10px', background: inviteLinkCopied ? '#16a34a' : '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
+                          style={{
+                            flexShrink: 0,
+                            width: 72,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 3,
+                            padding: '6px 8px',
+                            background: inviteLinkCopied
+                              ? 'linear-gradient(135deg, #15803d, #16a34a)'
+                              : 'linear-gradient(135deg, #1e40af, #2563eb)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            fontSize: 16,
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: inviteLinkCopied
+                              ? '0 0 16px rgba(22,163,74,0.4)'
+                              : '0 0 16px rgba(59,130,246,0.3)',
+                          }}
                         >
-                          {inviteLinkCopied ? (isRtl ? '✓ تم النسخ' : '✓ Copied!') : (isRtl ? 'نسخ' : 'Copy')}
+                          <span style={{ fontSize: 18 }}>{inviteLinkCopied ? '✓' : '📋'}</span>
+                          <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                            {inviteLinkCopied
+                              ? (isRtl ? 'تم ✓' : 'Copied!')
+                              : (isRtl ? 'نسخ' : 'Copy')}
+                          </span>
                         </button>
                       </div>
+                      {inviteLinkCopied && (
+                        <p style={{ margin: '8px 0 0', fontSize: 9, color: '#16a34a', fontWeight: 700, textAlign: 'center', animation: 'pulse 1s ease' }}>
+                          {isRtl ? '✓ تم نسخ الرابط بنجاح! أرسله للموظف الآن.' : '✓ Link copied! Send it to the employee now.'}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -6690,6 +6774,7 @@ export default function App() {
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           activeBranchName={activeBranchName}
+          theme={theme}
         />
 
         <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
