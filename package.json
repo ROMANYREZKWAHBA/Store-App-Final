@@ -7,11 +7,11 @@
   "main": "main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron-build": "node secure-build.js"
+    "electron-build": "vite build && npx javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser && cross-env VITE_APP_BASE=./ node secure-build.js"
   },
   "build": {
     "appId": "com.storepilot.app",
@@ -53,6 +53,7 @@
     "@vitejs/plugin-react": "^6.0.0",
     "autoprefixer": "^10.4.27",
     "concurrently": "^9.1.2",
+    "cross-env": "^10.1.0",
     "electron": "^35.2.1",
     "electron-builder": "^26.0.12",
     "eslint": "^9.39.4",
