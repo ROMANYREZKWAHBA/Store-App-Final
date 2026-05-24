@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useOnlineStatus } from './useOnlineStatus';
 import * as SB from './supabaseService';
+import { supabase } from './supabaseClient';
 import BranchManagement from './BranchManagement';
 import { fetchActiveBranches } from './branchService';
 import StockTransfersScreen from './StockTransfers';
@@ -2545,9 +2546,43 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
     URL.revokeObjectURL(url);
   };
 
-  const handleImportBackup = (event) => {
+  const handleImportBackup = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+    // Strict validation against live session status from Supabase
+    if (!isOnline || !cloudReady) {
+      alert(isRtl 
+        ? "⚠️ يجب أن تكون متصلاً بالإنترنت للتحقق من حالة اشتراكك قبل استيراد البيانات." 
+        : "⚠️ You must be online to verify your subscription status before importing data.");
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const settings = await SB.fetchSettings(branchId);
+      const liveStatus = settings?.subscription_status || 'trial';
+      const liveTrialStart = settings?.trial_start_date;
+      const liveSubEnd = settings?.subscription_end_date;
+      
+      const saas = checkSubscriptionStatus(liveStatus, liveTrialStart, liveSubEnd);
+      
+      if (saas.status !== 'active' || saas.expired) {
+        alert(isRtl 
+          ? "⚠️ عذراً، ميزة استيراد البيانات متاحة فقط للمشتركين في الباقات المدفوعة النشطة. يرجى ترقية اشتراكك لتتمكن من استيراد البيانات." 
+          : "⚠️ Sorry, data import is only available for active paid subscriptions. Please upgrade your subscription to import data.");
+        event.target.value = '';
+        return;
+      }
+    } catch (dbErr) {
+      console.error('Failed to verify live subscription status:', dbErr);
+      alert(isRtl 
+        ? "❌ فشل التحقق من حالة الاشتراك مع السيرفر. يرجى المحاولة مرة أخرى." 
+        : "❌ Failed to verify subscription status with the server. Please try again.");
+      event.target.value = '';
+      return;
+    }
+
     if (!window.confirm(isRtl ? "تحذير: هذه العملية ستمسح البيانات الحالية وتستبدلها بالنسخة الاحتياطية. هل أنت متأكد؟" : "Warning: This will overwrite all current data. Are you sure?")) {
         event.target.value = '';
         return;
@@ -3080,22 +3115,40 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [recoveryStep, setRecoveryStep] = useState('hwid'); // hwid | reset
+
+  // Desktop/Electron recovery state
+  const [recoveryStep, setRecoveryStep] = useState('hwid'); // 'hwid' | 'reset'
   const [hwid, setHwid] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
   const [selectedUserToReset, setSelectedUserToReset] = useState(null);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [isFetchingHwid, setIsFetchingHwid] = useState(false);
+  const [hwidError, setHwidError] = useState(false);
+
+  // Web/Supabase recovery state
+  // webResetStep: 'email' → user enters email
+  //               'email_sent' → link dispatched, awaiting user click
+  //               'update_password' → user sets new password
+  //               'done' → password updated successfully
+  const [webResetStep, setWebResetStep] = useState('email');
+  const [webResetEmail, setWebResetEmail] = useState('');
+  const [webNewPassword, setWebNewPassword] = useState('');
+  const [webConfirmPassword, setWebConfirmPassword] = useState('');
+  const [webResetMsg, setWebResetMsg] = useState(null); // { type: 'error'|'success', text: '' }
+  const [webResetLoading, setWebResetLoading] = useState(false);
+
   const isRtl = language === 'ar';
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isFetchingHwid, setIsFetchingHwid] = useState(false);
-  const [hwidError, setHwidError] = useState(false);
+
+  // ⚡ Detect runtime environment once — never changes within a session
+  const isWeb = !window.electronAPI?.getMachineId;
 
   // Sign up fields
   const [signUpStoreName, setSignUpStoreName] = useState('');
   const [signUpName, setSignUpName] = useState('');
-  const [signUpUsername, setSignUpUsername] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
 
   const handleCredentials = async () => {
@@ -3112,18 +3165,90 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
       setError(isRtl ? 'جميع الحقول مطلوبة' : 'All fields are required');
       return;
     }
-    if (!signUpName.trim() || !signUpUsername.trim() || !signUpPassword.trim()) {
+    if (!signUpName.trim() || !signUpEmail.trim() || !signUpPassword.trim()) {
       setError(isRtl ? 'جميع الحقول مطلوبة' : 'All fields are required');
       return;
     }
+
+    // Strict email/Gmail registration syntax validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(signUpEmail.trim())) {
+      setError(isRtl ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Please enter a valid email address');
+      return;
+    }
+
     setIsRegistering(true);
     setError(null);
+
+    // Browser Fingerprinting & Strict Anti-Trial-Hopping Check
+    if (isWeb && !inviteContext) {
+      const deviceToken = localStorage.getItem('_sp_device_token') || getCookie('_sp_device_token');
+      if (deviceToken) {
+        try {
+          const { data: existingBranches, error: checkErr } = await supabase
+            .from('branches')
+            .select('id, name')
+            .eq('machine_id', deviceToken);
+
+          if (checkErr) throw checkErr;
+
+          if (existingBranches && existingBranches.length > 0) {
+            let isBlocked = false;
+            for (const branch of existingBranches) {
+              const { data: settings } = await supabase
+                .from('store_settings')
+                .select('*')
+                .eq('branch_id', branch.id)
+                .maybeSingle();
+
+              if (settings) {
+                const status = settings.subscription_status || 'trial';
+                const trialStart = settings.trial_start_date;
+
+                if (status === 'expired') {
+                  isBlocked = true;
+                  break;
+                }
+                if (status === 'trial') {
+                  const start = new Date(trialStart);
+                  if (!isNaN(start.getTime())) {
+                    const now = new Date();
+                    const days = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+                    if (days > 14) {
+                      isBlocked = true;
+                      break;
+                    }
+                  } else {
+                    isBlocked = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (isBlocked) {
+              setError(isRtl 
+                ? "عذراً، لقد استفدت بالفعل من الفترة التجريبية المجانية على هذا الجهاز. يرجى ترقية حسابك الحالي."
+                : "Sorry, you have already used the free trial on this device. Please upgrade your current account.");
+              setIsRegistering(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('Failed to verify device token trial history:', e);
+        }
+      }
+    }
+
     // Pass inviteContext as 5th arg so handleSignUp can branch appropriately
-    const err = await onSignUp(signUpName.trim(), signUpUsername.trim(), signUpPassword.trim(), signUpStoreName.trim(), inviteContext || null);
+    const err = await onSignUp(signUpName.trim(), signUpEmail.trim(), signUpPassword.trim(), signUpStoreName.trim(), inviteContext || null);
     if (err) setError(err);
     setIsRegistering(false);
   };
 
+  // -----------------------------------------------------------------------
+  // DESKTOP-ONLY: Hardware ID fetch with retry
+  // -----------------------------------------------------------------------
   const fetchHwidWithRetry = async () => {
     setIsFetchingHwid(true);
     setHwidError(false);
@@ -3155,12 +3280,32 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
     setIsFetchingHwid(false);
   };
 
+  // -----------------------------------------------------------------------
+  // RECOVERY ENTRY POINT — branches on environment
+  // -----------------------------------------------------------------------
   const handleRecovery = async () => {
-    setShowRecoveryModal(true);
+    // Reset all recovery state cleanly
+    setWebResetStep('email');
+    setWebResetEmail('');
+    setWebNewPassword('');
+    setWebConfirmPassword('');
+    setWebResetMsg(null);
     setRecoveryStep('hwid');
-    await fetchHwidWithRetry();
+    setRecoveryKey('');
+    setSelectedUserToReset(null);
+    setNewUsername('');
+    setNewPassword('');
+    setShowRecoveryModal(true);
+
+    // Desktop: immediately start HWID fetch
+    if (!isWeb) {
+      await fetchHwidWithRetry();
+    }
   };
 
+  // -----------------------------------------------------------------------
+  // DESKTOP RECOVERY: Verify recovery key → allow reset
+  // -----------------------------------------------------------------------
   const verifyRecoveryKey = () => {
     const expectedKey = btoa(hwid + '-StorePilot-Recovery-2026');
     if (recoveryKey.trim() === expectedKey) {
@@ -3187,15 +3332,370 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
     }
   };
 
+  // -----------------------------------------------------------------------
+  // WEB RECOVERY: Supabase Auth — Send reset email
+  // -----------------------------------------------------------------------
+  const handleWebSendResetEmail = async () => {
+    if (!webResetEmail.trim() || !webResetEmail.includes('@')) {
+      setWebResetMsg({ type: 'error', text: isRtl ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Please enter a valid email address' });
+      return;
+    }
+    setWebResetLoading(true);
+    setWebResetMsg(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(webResetEmail.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setWebResetStep('email_sent');
+      setWebResetMsg({
+        type: 'success',
+        text: isRtl
+          ? '✅ تم إرسال رابط إعادة التعيين. تحقق من بريدك الإلكتروني وانقر على الرابط، ثم ارجع هنا لتحديث كلمة المرور.'
+          : '✅ Reset link sent! Check your inbox and click the link, then return here to set your new password.',
+      });
+    } catch (err) {
+      setWebResetMsg({
+        type: 'error',
+        text: isRtl
+          ? `❌ خطأ: ${err.message || 'فشل إرسال البريد الإلكتروني. تأكد من صحة العنوان.'}`
+          : `❌ Error: ${err.message || 'Failed to send reset email. Check the address and try again.'}`,
+      });
+    } finally {
+      setWebResetLoading(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // WEB RECOVERY: Supabase Auth — Update password after email link clicked
+  // -----------------------------------------------------------------------
+  const handleWebUpdatePassword = async () => {
+    if (!webNewPassword.trim() || webNewPassword.length < 6) {
+      setWebResetMsg({ type: 'error', text: isRtl ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters' });
+      return;
+    }
+    if (webNewPassword !== webConfirmPassword) {
+      setWebResetMsg({ type: 'error', text: isRtl ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match' });
+      return;
+    }
+    setWebResetLoading(true);
+    setWebResetMsg(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: webNewPassword });
+      if (error) throw error;
+      setWebResetStep('done');
+      setWebResetMsg({
+        type: 'success',
+        text: isRtl
+          ? '✅ تم تحديث كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.'
+          : '✅ Password updated successfully! You can now sign in with your new password.',
+      });
+    } catch (err) {
+      setWebResetMsg({
+        type: 'error',
+        text: isRtl
+          ? `❌ ${err.message?.includes('Auth session missing') ? 'انتهت صلاحية الجلسة. يرجى إعادة إرسال الرابط والمحاولة مجدداً.' : err.message || 'فشل تحديث كلمة المرور'}`
+          : `❌ ${err.message?.includes('Auth session missing') ? 'Session expired. Please resend the link and try again.' : err.message || 'Failed to update password'}`,
+      });
+    } finally {
+      setWebResetLoading(false);
+    }
+  };
+
+  // Detect if we've returned from a Supabase password reset link (hash contains access_token)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('access_token') && hash.includes('type=recovery')) {
+      setShowRecoveryModal(true);
+      setWebResetStep('update_password');
+      setWebResetMsg({
+        type: 'success',
+        text: isRtl
+          ? '✅ تم التحقق من الرابط. أدخل كلمة مرور جديدة أدناه.'
+          : '✅ Link verified! Enter your new password below.',
+      });
+      // Clean the hash from the URL so it doesn't re-trigger
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+  }, []);
+
   useEffect(() => {
     setError(null);
     setUsername('');
     setPassword('');
     setSignUpStoreName('');
     setSignUpName('');
-    setSignUpUsername('');
+    setSignUpEmail('');
     setSignUpPassword('');
   }, [selectedRole, authMode]);
+
+  // --------------------------------------------------------------------------
+  // RECOVERY MODAL CONTENT — environment-branched
+  // --------------------------------------------------------------------------
+  const renderRecoveryModal = () => (
+    <div className="absolute inset-0 flex items-center justify-center z-[400] p-4" style={{ background: 'rgba(15,23,42,0.80)', backdropFilter: 'blur(10px)' }}>
+      <div className="p-8 max-w-sm w-full relative" style={{ background: '#fff', borderRadius: 18, borderTop: '4px solid ' + (isWeb ? '#1e40af' : '#ef4444'), boxShadow: '0 24px 64px rgba(0,0,0,0.20)' }}>
+
+        {/* Modal header */}
+        <div className="flex items-center justify-between mb-6 pb-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{isWeb ? '🔐' : '🛡️'}</span>
+            <h3 className="text-base font-black" style={{ color: isWeb ? '#1e40af' : '#dc2626' }}>
+              {isWeb
+                ? (isRtl ? 'استعادة الحساب عبر البريد' : 'Cloud Account Recovery')
+                : (isRtl ? 'استعادة الحساب' : 'Security Recovery')}
+            </h3>
+          </div>
+          <button
+            onClick={() => setShowRecoveryModal(false)}
+            style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f5f9', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: '#64748b' }}
+          >✕</button>
+        </div>
+
+        {/* ----------------------------------------------------------------
+             WEB PATH: Supabase Auth reset
+             ---------------------------------------------------------------- */}
+        {isWeb && (
+          <div className="space-y-5">
+
+            {/* Feedback banner (error or success) */}
+            {webResetMsg && (
+              <div
+                className="p-4 rounded-xl text-xs font-bold leading-relaxed"
+                style={{
+                  background: webResetMsg.type === 'error' ? '#fef2f2' : '#f0fdf4',
+                  border: '1px solid ' + (webResetMsg.type === 'error' ? '#fecaca' : '#bbf7d0'),
+                  color: webResetMsg.type === 'error' ? '#dc2626' : '#16a34a',
+                }}
+              >
+                {webResetMsg.text}
+              </div>
+            )}
+
+            {/* STEP 1: Enter email */}
+            {webResetStep === 'email' && (
+              <div className="space-y-4">
+                <p className="text-xs text-[#64748b] font-medium leading-relaxed">
+                  {isRtl
+                    ? 'أدخل البريد الإلكتروني المسجل بحسابك في StorePilot. سنرسل لك رابط إعادة التعيين فوراً.'
+                    : 'Enter your registered StorePilot email. We\'ll send you an instant reset link.'}
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-[#1e40af] uppercase tracking-widest block">
+                    {isRtl ? 'البريد الإلكتروني المسجل' : 'Registered Email'}
+                  </label>
+                  <input
+                    type="email"
+                    value={webResetEmail}
+                    onChange={e => setWebResetEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleWebSendResetEmail()}
+                    placeholder={isRtl ? 'example@gmail.com' : 'example@gmail.com'}
+                    className="e-input w-full"
+                    autoFocus
+                    dir="ltr"
+                  />
+                </div>
+                <button
+                  onClick={handleWebSendResetEmail}
+                  disabled={webResetLoading || !webResetEmail.trim()}
+                  className="w-full py-3 rounded-xl font-black text-sm text-white transition-all"
+                  style={{ background: webResetLoading ? '#93c5fd' : '#1e40af', border: 'none', cursor: webResetLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {webResetLoading
+                    ? (isRtl ? '⏳ جاري الإرسال...' : '⏳ Sending...')
+                    : (isRtl ? '📧 إرسال رابط التعيين' : '📧 Send Reset Link')}
+                </button>
+              </div>
+            )}
+
+            {/* STEP 2: Email sent — prompt user to click the link then come back */}
+            {webResetStep === 'email_sent' && (
+              <div className="space-y-4">
+                <div className="text-center py-2">
+                  <span className="text-5xl">📬</span>
+                  <p className="mt-3 text-sm font-bold text-[#1e293b]">
+                    {isRtl ? 'تحقق من بريدك الإلكتروني' : 'Check your inbox'}
+                  </p>
+                  <p className="text-xs text-[#64748b] mt-1">
+                    {isRtl
+                      ? 'انقر على الرابط في البريد، ثم ارجع إلى هذه الصفحة وانقر على الزر أدناه.'
+                      : 'Click the link in the email, then return to this page and press the button below.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setWebResetStep('update_password'); setWebResetMsg(null); }}
+                  className="w-full py-3 rounded-xl font-black text-sm text-white transition-all"
+                  style={{ background: '#1e40af', border: 'none', cursor: 'pointer' }}
+                >
+                  {isRtl ? '✅ نقرت على الرابط — أحدّث كلمة المرور' : '✅ I clicked the link — Set New Password'}
+                </button>
+                <button
+                  onClick={() => { setWebResetStep('email'); setWebResetMsg(null); }}
+                  className="w-full py-2 text-xs font-bold text-[#64748b] hover:text-[#1e40af] transition-all bg-transparent border-0 cursor-pointer"
+                >
+                  {isRtl ? '← إعادة إرسال رابط مختلف' : '← Resend to a different email'}
+                </button>
+              </div>
+            )}
+
+            {/* STEP 3: Set new password (after clicking email link — Supabase puts token in session) */}
+            {webResetStep === 'update_password' && (
+              <div className="space-y-4">
+                <p className="text-xs text-[#64748b] font-medium">
+                  {isRtl ? 'أدخل كلمة المرور الجديدة لحسابك:' : 'Enter your new account password:'}
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-[#1e40af] uppercase tracking-widest block">
+                    {isRtl ? 'كلمة المرور الجديدة' : 'New Password'}
+                  </label>
+                  <input
+                    type="password"
+                    value={webNewPassword}
+                    onChange={e => setWebNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="e-input w-full"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-[#1e40af] uppercase tracking-widest block">
+                    {isRtl ? 'تأكيد كلمة المرور' : 'Confirm Password'}
+                  </label>
+                  <input
+                    type="password"
+                    value={webConfirmPassword}
+                    onChange={e => setWebConfirmPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleWebUpdatePassword()}
+                    placeholder="••••••••"
+                    className="e-input w-full"
+                  />
+                </div>
+                <button
+                  onClick={handleWebUpdatePassword}
+                  disabled={webResetLoading || !webNewPassword.trim() || !webConfirmPassword.trim()}
+                  className="w-full py-3 rounded-xl font-black text-sm text-white transition-all"
+                  style={{ background: webResetLoading ? '#93c5fd' : '#1e40af', border: 'none', cursor: webResetLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {webResetLoading
+                    ? (isRtl ? '⏳ جاري التحديث...' : '⏳ Updating...')
+                    : (isRtl ? '🔒 تحديث كلمة المرور' : '🔒 Update Password')}
+                </button>
+              </div>
+            )}
+
+            {/* STEP 4: Done */}
+            {webResetStep === 'done' && (
+              <div className="text-center space-y-4 py-2">
+                <span className="text-5xl">🎉</span>
+                <p className="text-sm font-bold text-[#16a34a] mt-2">
+                  {isRtl ? 'تم تحديث كلمة المرور!' : 'Password Updated!'}
+                </p>
+                <p className="text-xs text-[#64748b]">
+                  {isRtl ? 'سجّل دخولك الآن بكلمة المرور الجديدة.' : 'You can now sign in with your new password.'}
+                </p>
+                <button
+                  onClick={() => setShowRecoveryModal(false)}
+                  className="w-full py-3 rounded-xl font-black text-sm text-white"
+                  style={{ background: '#16a34a', border: 'none', cursor: 'pointer' }}
+                >
+                  {isRtl ? '← العودة لتسجيل الدخول' : '← Back to Sign In'}
+                </button>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ----------------------------------------------------------------
+             DESKTOP / ELECTRON PATH: HWID + Recovery Key (unchanged)
+             ---------------------------------------------------------------- */}
+        {!isWeb && (
+          <div>
+            {recoveryStep === 'hwid' && (
+              <div className="space-y-4">
+                <p className="text-[10px] uppercase tracking-widest text-[#64748b] mb-4">
+                  {isRtl ? 'يرجى إرسال المعرف أدناه للمسؤول للحصول على كود إعادة التعيين.' : 'Provide the Hardware ID below to your administrator for a reset code.'}
+                </p>
+
+                {isFetchingHwid ? (
+                  <div className="bg-slate-50 p-4 mb-1 font-mono text-[10px] text-amber-600 text-center border border-amber-200 animate-pulse font-black uppercase tracking-wider rounded-xl">
+                    {isRtl ? 'جاري تحميل معرف الجهاز...' : 'Loading Machine ID...'}
+                  </div>
+                ) : hwidError ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={fetchHwidWithRetry}
+                      className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl"
+                    >
+                      {isRtl ? 'إعادة المحاولة يدوياً' : 'Manual Retry'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-3 mb-1 font-mono text-[10px] text-teal-600 break-all select-all border border-slate-200 rounded-xl" style={{ userSelect: 'all', cursor: 'copy' }}>
+                    {hwid || 'LOADING...'}
+                  </div>
+                )}
+
+                <p className="text-[9px] text-red-400 opacity-70 mb-4">{isRtl ? 'استخدم أداة المسؤول لتوليد الكود' : 'Use Admin Tool to generate current code'}</p>
+
+                <label className="text-[10px] font-black text-red-500 uppercase tracking-widest block mb-2">{isRtl ? 'كود الاستعادة' : 'Recovery Key'}</label>
+                <input
+                  type="text"
+                  value={recoveryKey}
+                  onChange={e => setRecoveryKey(e.target.value)}
+                  placeholder={isRtl ? 'أدخل الكود هنا...' : 'Enter Recovery Key...'}
+                  className="w-full border border-red-200 px-4 py-3 font-bold text-[#1e293b] outline-none mb-4 rounded-xl bg-white text-sm"
+                />
+
+                <div className="flex gap-2">
+                  <button onClick={() => setShowRecoveryModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-500 font-black uppercase text-[10px] tracking-widest rounded-xl border-0 cursor-pointer">{isRtl ? 'إلغاء' : 'Cancel'}</button>
+                  <button
+                    onClick={verifyRecoveryKey}
+                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl border-0 cursor-pointer"
+                  >
+                    {isRtl ? 'تحقق ومتابعة' : 'Verify & Proceed'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {recoveryStep === 'reset' && (
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">
+                  {isRtl ? 'اختر حساباً لإعادة تعيينه' : 'Select User Account'}
+                </label>
+                <select
+                  value={selectedUserToReset}
+                  onChange={e => setSelectedUserToReset(e.target.value)}
+                  className="w-full border border-slate-200 p-3 text-[#1e293b] font-bold outline-none mb-2 rounded-xl text-sm bg-white"
+                >
+                  <option value="">{isRtl ? 'اختر مستخدماً...' : 'Choose user...'}</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'اسم المستخدم الجديد' : 'New Username'}</label>
+                    <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="w-full border border-slate-200 px-4 py-3 font-bold text-[#1e293b] outline-none rounded-xl bg-white text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'كلمة المرور الجديدة' : 'New Password'}</label>
+                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border border-slate-200 px-4 py-3 font-bold text-[#1e293b] outline-none rounded-xl bg-white text-sm" />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setRecoveryStep('hwid')} className="flex-1 py-3 bg-slate-100 text-slate-500 font-black uppercase text-[10px] tracking-widest rounded-xl border-0 cursor-pointer">{isRtl ? 'رجوع' : 'Back'}</button>
+                  <button onClick={handleResetPassword} disabled={!selectedUserToReset || !newUsername || !newPassword} className="flex-[2] py-3 bg-[#1e40af] text-white font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-blue-200 rounded-xl border-0 cursor-pointer">
+                    💾 {isRtl ? 'حفظ ودخول' : 'Save & Login'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -3284,7 +3784,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
             <p className="text-[#64748b] font-medium text-sm">
               {authMode === 'login'
                 ? (isRtl ? 'أدخل بياناتك للدخول إلى لوحة التحكم' : 'Enter your credentials to access your dashboard')
-                : (isRtl ? 'ابدأ تجربتك المجانية لمدة 7 أيام' : 'Start your 7-day free trial — no card needed')}
+                : (isRtl ? 'ابدأ تجربتك المجانية لمدة 14 يوم' : 'Start your 14-day free trial — no card needed')}
             </p>
           </div>
 
@@ -3374,8 +3874,8 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                 <input type="text" value={signUpName} onChange={e => setSignUpName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسمك الكامل...' : 'Your full name...'} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم' : 'Username'}</label>
-                <input type="text" value={signUpUsername} onChange={e => setSignUpUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Choose a username...'} />
+                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'البريد الإلكتروني (Gmail)' : 'Email Address (Gmail)'}</label>
+                <input type="email" value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} className="e-input" placeholder={isRtl ? 'البريد الإلكتروني...' : 'example@gmail.com'} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
@@ -3391,7 +3891,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                   ? (isRtl ? 'جاري إنشاء الحساب...' : 'Creating account...')
                   : inviteContext
                     ? (isRtl ? '✓ قبول الدعوة والانضمام' : '✓ Accept Invitation & Join')
-                    : (isRtl ? '🚀 بدء التجربة المجانية 7 أيام' : '🚀 Start 7-Day Free Trial')
+                    : (isRtl ? '🚀 بدء التجربة المجانية 14 يوم' : '🚀 Start 14-Day Free Trial')
                 }
               </button>
               {!inviteContext && (
@@ -3420,95 +3920,8 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
         </div>
       </div>
 
-      {/* Recovery Modal remains perfectly functional */}
-      {showRecoveryModal && (
-        <div className="absolute inset-0 flex items-center justify-center z-[400] p-4" style={{ background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)' }}>
-          <div className="p-8 max-w-sm w-full relative" style={{ background: '#fff', borderRadius: 16, borderTop: '4px solid #ef4444', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
-            <h3 className="text-lg font-black text-red-600 mb-5 pb-3" style={{ borderBottom: '1px solid #fecaca' }}>
-              {isRtl ? 'استعادة الحساب' : 'Security Recovery'}
-            </h3>
-            
-            {recoveryStep === 'hwid' && (
-              <div className="space-y-4">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-4">
-                  {isRtl ? 'يرجى إرسال المعرف أدناه للمسؤول للحصول على كود إعادة التعيين.' : 'Provide the Hardware ID below to your administrator for a reset code.'}
-                </p>
-                
-                {isFetchingHwid ? (
-                  <div className="bg-[var(--bg-deep)] p-4 mb-1 font-mono text-[10px] text-amber-500 text-center border border-rose-500/20 animate-pulse font-black uppercase tracking-wider rounded-xl">
-                    {isRtl ? 'جاري تحميل معرف الجهاز...' : 'Loading Machine ID (retrying)...'}
-                  </div>
-                ) : hwidError ? (
-                  <div className="space-y-2">
-                    <button 
-                      type="button"
-                      onClick={fetchHwidWithRetry}
-                      className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl">
-                      {isRtl ? 'إعادة المحاولة يدوياً' : 'Manual Retry'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-[var(--bg-deep)] p-3 mb-1 font-mono text-[10px] text-teal-400 break-all select-all border border-[var(--border-color)] rounded-xl" style={{ userSelect: 'all', cursor: 'pointer' }}>
-                    {hwid || 'BROWSER-TEST-ID-2026'}
-                  </div>
-                )}
-
-                <p className="text-[9px] text-rose-400 opacity-60 mb-4">{isRtl ? 'استخدم أداة المسؤول لتوليد الكود' : 'Use Admin Tool to generate current code'}</p>
-                
-                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest block mb-2">{isRtl ? 'كود الاستعادة' : 'Recovery Key'}</label>
-                <input 
-                  type="text" 
-                  value={recoveryKey} 
-                  onChange={e => setRecoveryKey(e.target.value)}
-                  placeholder={isRtl ? 'أدخل الكود هنا...' : 'Enter Recovery Key...'} 
-                  className="w-full bg-[var(--bg-deep)] border border-rose-500/30 px-4 py-3 font-bold text-[var(--text-primary)] outline-none mb-4 rounded-xl" 
-                />
-                
-                <div className="flex gap-2">
-                  <button onClick={() => setShowRecoveryModal(false)} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl">{isRtl ? 'إلغاء' : 'Cancel'}</button>
-                  <button 
-                    onClick={verifyRecoveryKey}
-                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-[10px] tracking-widest transition-all rounded-xl">
-                    {isRtl ? 'تحقق ومتابعة' : 'Verify & Proceed'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {recoveryStep === 'reset' && (
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">
-                  {isRtl ? 'اختر حساباً لإعادة تعيينه' : 'Select User Account'}
-                </label>
-                <select 
-                  value={selectedUserToReset} 
-                  onChange={e => setSelectedUserToReset(e.target.value)} 
-                  className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] p-3 text-[var(--text-primary)] font-bold outline-none mb-2 rounded-xl"
-                >
-                  <option value="">{isRtl ? 'اختر مستخدماً...' : 'Choose user...'}</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                </select>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'اسم المستخدم الجديد' : 'New Username'}</label>
-                    <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">{isRtl ? 'كلمة المرور الجديدة' : 'New Password'}</label>
-                    <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] px-4 py-3 font-bold text-[var(--text-primary)] outline-none rounded-xl" />
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button onClick={() => setRecoveryStep('hwid')} className="flex-1 py-3 bg-[var(--bg-deep)] text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl">{isRtl ? 'إلغاء' : 'Cancel'}</button>
-                  <button onClick={handleResetPassword} disabled={!selectedUserToReset || !newUsername || !newPassword} className="flex-[2] py-3 bg-[#0066FF] text-white font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-[#0066FF]/20 rounded-xl">
-                    💾 {isRtl ? 'حفظ ودخول' : 'Save & Login'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Environment-aware Recovery Modal */}
+      {showRecoveryModal && renderRecoveryModal()}
     </div>
   );
 }
@@ -5452,6 +5865,20 @@ const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shift
   return expected;
 };
 
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+const setCookie = (name, value, days) => {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = `; expires=${date.toUTCString()}`;
+  document.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Strict; Secure`;
+};
+
 const checkSubscriptionStatus = (statusOrSettings, activationDateStr, expiryDateStr) => {
   let status;
   let actDate;
@@ -5483,7 +5910,7 @@ const checkSubscriptionStatus = (statusOrSettings, activationDateStr, expiryDate
     if (isNaN(trialStart.getTime())) {
       return { status: 'expired', daysLeft: 0, expired: true };
     }
-    expiryDate = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+    expiryDate = new Date(trialStart.getTime() + 14 * 24 * 60 * 60 * 1000);
   } else if (status === 'active') {
     if (expDate) {
       expiryDate = new Date(expDate);
@@ -5765,19 +6192,48 @@ export default function App() {
     async function bootFromCloud() {
       try {
         // Get or create branch (use machine-id from Electron, fallback to localStorage fingerprint)
-        let machineId = localStorage.getItem('_sp_machine_id');
-        if (window.electronAPI?.getMachineId) {
-          try { machineId = await window.electronAPI.getMachineId(); } catch(e) {}
+        // ⚡ ENVIRONMENT-AWARE MACHINE ID
+        // Web/Vercel: generate a stable fingerprint ID synchronously — no Electron
+        // API call, no async wait, no hang. Desktop/Electron: use the real hardware ID.
+        let machineId = localStorage.getItem('_sp_machine_id') || getCookie('_sp_device_token');
+
+        const isElectron = !!(window.electronAPI?.getMachineId);
+
+        if (isElectron && !machineId) {
+          // Desktop only — async hardware ID fetch
+          try { machineId = await window.electronAPI.getMachineId(); } catch(e) {
+            console.warn('⚠️ Electron getMachineId failed, falling back to fingerprint:', e);
+          }
         }
+
         if (!machineId) {
-          machineId = 'web-' + (navigator.userAgent.slice(0, 40)).replace(/[^a-zA-Z0-9]/g, '');
-          localStorage.setItem('_sp_machine_id', machineId);
+          // Web fallback: stable fingerprint from userAgent + random salt
+          machineId = 'web-' + (navigator.userAgent.slice(0, 40)).replace(/[^a-zA-Z0-9]/g, '') + '-' + Math.random().toString(36).substring(2, 10);
         }
+
+        if (!isElectron) {
+          localStorage.setItem('_sp_machine_id', machineId);
+          localStorage.setItem('_sp_device_token', machineId);
+          setCookie('_sp_device_token', machineId, 3650); // 10 years
+        }
+
+        // Helper to race a promise against a timeout
+        const promiseWithTimeout = (promise, ms) => {
+          return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+          ]);
+        };
 
         // Attempt to get/create machine branch — non-fatal if it fails
         let branch = null;
         try {
-          branch = await SB.getOrCreateBranch(machineId, storeName);
+          if (!isElectron) {
+            // Web timeout: 3 seconds limit to resolve or create machine branch
+            branch = await promiseWithTimeout(SB.getOrCreateBranch(machineId, storeName), 3000);
+          } else {
+            branch = await SB.getOrCreateBranch(machineId, storeName);
+          }
         } catch (branchErr) {
           console.error('⚠️ Initial Supabase Query Error (getOrCreateBranch) Details:', {
             message: branchErr.message,
@@ -5796,9 +6252,7 @@ export default function App() {
           setBranchId(branch.id);
 
           // Load all data from Supabase
-          const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
-                 cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
-                 cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
+          const fetchPromise = Promise.all([
             SB.fetchUsers(branch.id),
             SB.fetchCategories(branch.id),
             SB.fetchItems(branch.id),
@@ -5812,6 +6266,13 @@ export default function App() {
             SB.fetchUserPermissions(branch.id),
             SB.fetchSettings(branch.id),
           ]);
+
+          const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
+                 cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
+                 cloudStaffPayments, cloudUserPerms, cloudSettings] = 
+            !isElectron
+              ? await promiseWithTimeout(fetchPromise, 4000)
+              : await fetchPromise;
 
           if (cancelled) return;
 
@@ -6081,6 +6542,21 @@ export default function App() {
 
   const handleSignUp = async (name, username, password, signUpStoreName, inviteCtx) => {
     try {
+      // Connect to Supabase Auth signUp if on Web
+      if (cloudReady) {
+        const isElectron = !!(window.electronAPI?.getMachineId);
+        if (!isElectron) {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: username, // username represents the email address
+            password: password,
+          });
+          if (authError) {
+            console.error('Supabase Auth signUp failed:', authError);
+            return authError.message;
+          }
+        }
+      }
+
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
 
       // -----------------------------------------------------------------------
@@ -6248,8 +6724,8 @@ export default function App() {
       
       if (planType === 'trial') {
         status = 'trial';
-        expiry = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        trialDays = 7;
+        expiry = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+        trialDays = 14;
         
         localStorage.setItem('activationDate', now.toISOString());
         localStorage.setItem('pos_trial_start_date', now.toISOString());
