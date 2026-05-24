@@ -3190,7 +3190,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
           const { data: existingBranches, error: checkErr } = await supabase
             .from('branches')
             .select('id, name')
-            .eq('machine_id', deviceToken);
+            .or(`machine_id.eq.${deviceToken},machine_id.like.*:${deviceToken}`);
 
           if (checkErr) throw checkErr;
 
@@ -3702,7 +3702,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
   return (
     <div
       className="enterprise-ui min-h-screen w-full flex flex-col md:grid md:grid-cols-2 overflow-x-hidden relative"
-      style={{ background: '#f8fafc', fontFamily: isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
+      style={{ background: 'var(--bg-deep)', fontFamily: isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       
@@ -3751,16 +3751,16 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
       </div>
 
       {/* Right Side (Form) */}
-      <div className="flex items-center justify-center p-6 md:p-12 relative min-h-screen" style={{ background: '#f8fafc' }}>
+      <div className="flex items-center justify-center p-6 md:p-12 relative min-h-screen" style={{ background: 'var(--bg-deep)' }}>
         {/* Top row: mobile logo + language */}
         <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
           <div className="flex items-center gap-2 md:hidden">
             <div className="w-8 h-8 rounded-lg bg-[#1e40af] flex items-center justify-center text-white text-sm">🚀</div>
-            <span className="font-black text-sm text-[#1e293b]">StorePilot <span className="text-[#1e40af]">PRO</span></span>
+            <span className="font-black text-sm text-[var(--text-primary)]">StorePilot <span className="text-[#1e40af]">PRO</span></span>
           </div>
           <button
             onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-            className="px-4 py-2 border border-[#e2e8f0] text-[#64748b] hover:text-[#1e40af] hover:border-[#1e40af] font-bold text-sm rounded-lg transition-all ml-auto"
+            className="px-4 py-2 border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[#1e40af] hover:border-[#1e40af] font-bold text-sm rounded-lg transition-all ml-auto bg-transparent"
           >
             {isRtl ? 'English' : 'العربية'}
           </button>
@@ -3768,22 +3768,22 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 
         {/* Enterprise Auth Card — white, blue top border, soft shadow */}
         <div
-          className="auth-fade w-full max-w-md bg-white p-8 md:p-10 space-y-7"
+          className="auth-fade w-full max-w-md bg-[var(--bg-card)] p-8 md:p-10 space-y-7"
           style={{
             borderRadius: 16,
             borderTop: '5px solid #1e40af',
-            boxShadow: '0 4px 24px rgba(30,64,175,0.10), 0 1px 6px rgba(0,0,0,0.05)',
+            boxShadow: theme === 'dark' ? '0 4px 24px rgba(0,0,0,0.4)' : '0 4px 24px rgba(30,64,175,0.10), 0 1px 6px rgba(0,0,0,0.05)',
           }}
         >
           <div className="text-center space-y-1">
             <div className="flex justify-center gap-2 items-center mb-2">
               <div className="w-9 h-9 bg-[#1e40af] rounded-lg flex items-center justify-center text-white text-base">🚀</div>
-              <span className="font-black text-[#1e293b] text-base">StorePilot <span className="text-[#1e40af]">PRO</span></span>
+              <span className="font-black text-[var(--text-primary)] text-base">StorePilot <span className="text-[#1e40af]">PRO</span></span>
             </div>
-            <h2 className="font-black text-[#1e293b] text-2xl">
+            <h2 className="font-black text-[var(--text-primary)] text-2xl">
               {authMode === 'login' ? (isRtl ? 'تسجيل الدخول' : 'Sign In') : (isRtl ? 'إنشاء حساب جديد' : 'Create Account')}
             </h2>
-            <p className="text-[#64748b] font-medium text-sm">
+            <p className="text-[var(--text-secondary)] font-medium text-sm">
               {authMode === 'login'
                 ? (isRtl ? 'أدخل بياناتك للدخول إلى لوحة التحكم' : 'Enter your credentials to access your dashboard')
                 : (isRtl ? 'ابدأ تجربتك المجانية لمدة 14 يوم' : 'Start your 14-day free trial — no card needed')}
@@ -3802,11 +3802,11 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
               {/* Unified Sign In Form */}
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المستخدم أو البريد الإلكتروني' : 'Username or Email'}</label>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'اسم المستخدم أو البريد الإلكتروني' : 'Username or Email'}</label>
                   <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم المستخدم...' : 'Enter username...'} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
                   <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="e-input" placeholder="••••••••" />
                 </div>
                 <button
@@ -3819,7 +3819,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                 </button>
               </div>
 
-              <button onClick={handleRecovery} className="w-full text-xs font-bold text-[#64748b] hover:text-[#1e40af] transition-all mt-2">
+              <button onClick={handleRecovery} className="w-full text-xs font-bold text-[var(--text-secondary)] hover:text-[#1e40af] transition-all mt-2">
                 {isRtl ? 'نسيت بيانات الدخول؟' : 'Forgot credentials?'}
               </button>
             </div>
@@ -3866,21 +3866,21 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
               {/* Store Name — hidden when signing up via invite */}
               {!inviteContext && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'اسم المتجر' : 'Store Name'}</label>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'اسم المتجر' : 'Store Name'}</label>
                   <input type="text" value={signUpStoreName} onChange={e => setSignUpStoreName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسم متجرك...' : 'Your store name...'} />
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'الاسم الكامل' : 'Full Name'}</label>
+                <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'الاسم الكامل' : 'Full Name'}</label>
                 <input type="text" value={signUpName} onChange={e => setSignUpName(e.target.value)} className="e-input" placeholder={isRtl ? 'اسمك الكامل...' : 'Your full name...'} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'البريد الإلكتروني (Gmail)' : 'Email Address (Gmail)'}</label>
+                <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'البريد الإلكتروني (Gmail)' : 'Email Address (Gmail)'}</label>
                 <input type="email" value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} className="e-input" placeholder={isRtl ? 'البريد الإلكتروني...' : 'example@gmail.com'} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#64748b] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
+                <label className="text-xs font-bold text-[var(--text-secondary)] block">{isRtl ? 'كلمة المرور' : 'Password'}</label>
                 <input type="password" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} className="e-input" placeholder="••••••••" />
               </div>
               <button
@@ -3897,7 +3897,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
                 }
               </button>
               {!inviteContext && (
-                <p className="text-center text-xs text-[#94a3b8] font-medium">
+                <p className="text-center text-xs text-[var(--text-secondary)] font-medium">
                   {isRtl ? 'لا توجد رسوم، لا بطاقة ائتمان مطلوبة.' : 'No charge. No credit card required.'}
                 </p>
               )}
@@ -3905,14 +3905,14 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
           )}
 
           {/* Toggle Auth Mode */}
-          <div className="pt-4 border-t border-[#e2e8f0] text-center">
+          <div className="pt-4 border-t border-[var(--border-color)] text-center">
             <button
               type="button"
               onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
               className="text-sm font-semibold transition-all"
-              style={{ color: '#64748b' }}
+              style={{ color: 'var(--text-secondary)' }}
               onMouseOver={e => e.currentTarget.style.color = '#1e40af'}
-              onMouseOut={e => e.currentTarget.style.color = '#64748b'}
+              onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
             >
               {authMode === 'login'
                 ? (isRtl ? 'ليس لديك حساب؟ ابدأ تجربة مجانية →' : "Don't have an account? Start free trial →")
@@ -4318,7 +4318,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
   // Load branches when modal opens
   const loadBranches = async () => {
     setBranchesLoading(true);
-    const { data } = await fetchActiveBranches();
+    const { data } = await fetchActiveBranches(currentUser?.id);
     setBranchList(data);
     setBranchesLoading(false);
   };
@@ -6845,6 +6845,29 @@ export default function App() {
         setActiveBranchName('Main Branch');
         localStorage.setItem('active_branch_id', branchId);
         localStorage.setItem('active_branch_name', 'Main Branch');
+        
+        // Tenant branch association hook on signup:
+        if (cloudReady) {
+          supabase
+            .from('branches')
+            .select('*')
+            .eq('id', branchId)
+            .maybeSingle()
+            .then(({ data: activeBranch }) => {
+              if (activeBranch && activeBranch.machine_id && !activeBranch.machine_id.includes(':')) {
+                const updatedMachineId = `${userId}:${activeBranch.machine_id}`;
+                supabase
+                  .from('branches')
+                  .update({ machine_id: updatedMachineId })
+                  .eq('id', branchId)
+                  .then(({ error: updateErr }) => {
+                    if (updateErr) console.error('Failed to update machine_id on signup:', updateErr);
+                    else console.log(`🔗 Associated branch ${branchId} with owner ${userId} on signup`);
+                  });
+              }
+            })
+            .catch(assocErr => console.error('Failed to associate branch on signup:', assocErr));
+        }
       }
 
       setActiveTab('dashboard');
@@ -6969,6 +6992,30 @@ export default function App() {
         }
         setCurrentUser(cloudUser);
         console.log("=== YOUR REAL USER ID ===", cloudUser.id);
+        
+        // Tenant branch association hook on login:
+        if (cloudUser.role === 'Owner' && branchId && cloudReady) {
+          try {
+            const { data: activeBranch } = await supabase
+              .from('branches')
+              .select('*')
+              .eq('id', branchId)
+              .maybeSingle();
+
+            if (activeBranch && activeBranch.machine_id && !activeBranch.machine_id.includes(':')) {
+              const updatedMachineId = `${cloudUser.id}:${activeBranch.machine_id}`;
+              const { error: updateErr } = await supabase
+                .from('branches')
+                .update({ machine_id: updatedMachineId })
+                .eq('id', branchId);
+              if (updateErr) console.error('Failed to update machine_id on login:', updateErr);
+              else console.log(`🔗 Associated branch ${branchId} with owner ${cloudUser.id} on login`);
+            }
+          } catch (assocErr) {
+            console.error('Failed to associate branch on login:', assocErr);
+          }
+        }
+
         // Bind session to user's assigned branch
         if (cloudUser.assignedBranchId && cloudUser.role !== 'Owner') {
           setBranchId(cloudUser.assignedBranchId);
@@ -7283,7 +7330,7 @@ export default function App() {
       case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
       case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
-        ? <BranchManagement language={language} />
+        ? <BranchManagement language={language} currentUser={currentUser} />
         : <div className="flex flex-col items-center justify-center h-full gap-6 p-10">
             <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center"><span className="text-4xl">🔒</span></div>
             <h2 className="text-xl font-black text-white uppercase tracking-wider">{isRtl ? 'غير مصرح' : 'Unauthorized'}</h2>
@@ -7393,6 +7440,15 @@ export default function App() {
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>{activeBranchName}</span>
               </div>
             )}
+            <button
+              onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'var(--bg-deep)', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s' }}
+              title={isRtl ? (theme === 'dark' ? 'الوضع المضيء' : 'الوضع المظلم') : (theme === 'dark' ? 'Light Mode' : 'Dark Mode')}
+              onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent-blue)'; e.currentTarget.style.background = 'var(--accent-blue-light)'; }}
+              onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'var(--bg-deep)'; }}
+            >
+              <span style={{ fontSize: 16 }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+            </button>
             {branchId && (
               <button
                 onClick={handleManualSync}
@@ -7499,6 +7555,8 @@ export default function App() {
             <LandingPage
               language={language}
               setLanguage={setLanguage}
+              theme={theme}
+              setTheme={setTheme}
               onLogin={() => { setShowAuth(true); navigateTo('auth'); }}
               onGetStarted={() => { setShowAuth(true); navigateTo('auth'); }}
             />

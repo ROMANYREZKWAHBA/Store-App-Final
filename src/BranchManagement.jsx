@@ -113,7 +113,7 @@ function AddBranchModal({ isOpen, onClose, onSubmit, isRtl }) {
   );
 }
 
-export default function BranchManagement({ language }) {
+export default function BranchManagement({ language, currentUser }) {
   const isRtl = language === 'ar';
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,15 +122,15 @@ export default function BranchManagement({ language }) {
 
   const loadBranches = useCallback(async () => {
     setLoading(true);
-    const { data } = await fetchAllBranches();
+    const { data } = await fetchAllBranches(currentUser?.id);
     setBranches(data);
     setLoading(false);
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => { loadBranches(); }, [loadBranches]);
 
   const handleCreate = async (branchData) => {
-    const result = await createBranch(branchData);
+    const result = await createBranch(branchData, currentUser?.id);
     if (!result.error) {
       setBranches(prev => [result.data, ...prev]);
     }

@@ -6,13 +6,20 @@ import { supabase } from './supabaseClient';
 
 /**
  * Fetch all branches from Supabase, ordered by creation date (newest first).
+ * @param {string} [ownerId]
  * @returns {Promise<{data: Array, error: object|null}>}
  */
-export async function fetchAllBranches() {
-  const { data, error } = await supabase
+export async function fetchAllBranches(ownerId) {
+  let query = supabase
     .from('branches')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (ownerId) {
+    query = query.like('machine_id', `${ownerId}:%`);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('❌ fetchAllBranches:', error);
@@ -23,14 +30,20 @@ export async function fetchAllBranches() {
 
 /**
  * Fetch only active branches (for dropdowns).
+ * @param {string} [ownerId]
  * @returns {Promise<{data: Array, error: object|null}>}
  */
-export async function fetchActiveBranches() {
-  const { data, error } = await supabase
+export async function fetchActiveBranches(ownerId) {
+  let query = supabase
     .from('branches')
     .select('id, name')
-    .eq('is_active', true)
-    .order('name', { ascending: true });
+    .eq('is_active', true);
+
+  if (ownerId) {
+    query = query.like('machine_id', `${ownerId}:%`);
+  }
+
+  const { data, error } = await query.order('name', { ascending: true });
 
   if (error) {
     console.error('❌ fetchActiveBranches:', error);
@@ -42,18 +55,25 @@ export async function fetchActiveBranches() {
 /**
  * Insert a new branch. The database trigger will auto-create a safe entry.
  * @param {{ name: string, address?: string, phone?: string }} branch
+ * @param {string} [ownerId]
  * @returns {Promise<{data: object|null, error: object|null}>}
  */
-export async function createBranch({ name, address = '', phone = '' }) {
+export async function createBranch({ name, address = '', phone = '' }, ownerId) {
+  const insertData = {
+    name: name.trim(),
+    address: address.trim(),
+    phone: phone.trim(),
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  if (ownerId) {
+    insertData.machine_id = `${ownerId}:branch-${Math.random().toString(36).substring(7)}`;
+  }
+
   const { data, error } = await supabase
     .from('branches')
-    .insert({
-      name: name.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
-      is_active: true,
-      created_at: new Date().toISOString(),
-    })
+    .insert(insertData)
     .select()
     .single();
 

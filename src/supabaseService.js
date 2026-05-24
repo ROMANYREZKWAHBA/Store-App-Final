@@ -8,11 +8,11 @@ export async function getOrCreateBranch(machineId, branchName = 'Main Branch') {
   const { data: existing, error: findError } = await supabase
     .from('branches')
     .select('*')
-    .eq('machine_id', machineId)
-    .single();
+    .or(`machine_id.eq.${machineId},machine_id.like.*:${machineId}`)
+    .maybeSingle();
 
   if (existing) return existing;
-  if (findError && findError.code !== 'PGRST116') { // PGRST116 is code for no rows found
+  if (findError) {
     console.error('❌ getOrCreateBranch: failed to find branch:', {
       message: findError.message,
       code: findError.code,

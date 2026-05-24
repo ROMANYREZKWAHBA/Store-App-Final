@@ -12,7 +12,7 @@ const STATUS = {
   rejected: { en: 'Rejected', ar: 'مرفوض',         color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
 };
 
-function NewTransferModal({ isOpen, onClose, onSubmit, items, currentBranchId, isRtl }) {
+function NewTransferModal({ isOpen, onClose, onSubmit, items, currentBranchId, isRtl, currentUser }) {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toBranchId, setToBranchId] = useState('');
@@ -23,10 +23,10 @@ function NewTransferModal({ isOpen, onClose, onSubmit, items, currentBranchId, i
 
   useEffect(() => {
     if (isOpen) {
-      fetchActiveBranches().then(({ data }) => setBranches(data.filter(b => b.id !== currentBranchId)));
+      fetchActiveBranches(currentUser?.id).then(({ data }) => setBranches(data.filter(b => b.id !== currentBranchId)));
       setToBranchId(''); setItemId(''); setQuantity(''); setNotes(''); setError('');
     }
-  }, [isOpen, currentBranchId]);
+  }, [isOpen, currentBranchId, currentUser]);
 
   const selectedItem = items.find(i => i.id === itemId);
 
@@ -334,7 +334,7 @@ export default function StockTransfersScreen({ currentUser, branchId, items, lan
       </div>
 
       <NewTransferModal isOpen={showModal} onClose={() => setShowModal(false)} onSubmit={handleCreate}
-        items={items} currentBranchId={branchId} isRtl={isRtl} />
+        items={items} currentBranchId={branchId} isRtl={isRtl} currentUser={currentUser} />
     </div>
   );
 }

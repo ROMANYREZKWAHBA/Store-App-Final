@@ -46,18 +46,18 @@
 
 /* ── Dark Mode Override (persisted via pos_theme=dark) */
 [data-theme="dark"] {
-  --bg-deep:    #0a0a0c;
-  --bg-card:    #111114;
-  --bg-sidebar: #050507;
-  --bg-header:  #0d0d10;
-  --border-color: #1e1e24;
+  --bg-deep:    #0B0F19;
+  --bg-card:    #1E293B;
+  --bg-sidebar: #0B0F19;
+  --bg-header:  #1E293B;
+  --border-color: #334155;
   --accent-blue:   #3b82f6;
   --accent-blue-light: #1e3a8a20;
   --accent-gold:   #D4AF37;
   --accent-gold-muted: #D4AF3715;
   --accent-purple: #8120FF;
-  --text-primary:   #f1f5f9;
-  --text-secondary: #94a3b8;
+  --text-primary:   #F9FAFB;
+  --text-secondary: #9CA3AF;
   --text-muted:     #475569;
   --sidebar-active-bg:   #1e3a8a30;
   --sidebar-active-text: #60a5fa;
@@ -121,7 +121,7 @@ body[dir="rtl"] {
 /* Input */
 .e-input {
   width: 100%;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid var(--border-color);
   border-radius: 8px;
   padding: 12px 16px;
