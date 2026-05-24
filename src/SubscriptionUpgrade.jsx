@@ -47,7 +47,7 @@ export default function SubscriptionUpgrade({ onSubscribe, onLogout, language, c
         {localStorage.getItem('pos_subscription_status') === 'expired' && (
           <div className="relative overflow-hidden bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 dark:border-rose-500/30 p-4 text-xs font-black tracking-widest uppercase text-rose-500 dark:text-rose-400 text-center animate-[fadeIn_0.5s_ease] flex flex-col items-center justify-center gap-1">
             <span className="text-lg">⚠️</span>
-            <span>{isRtl ? 'لقد انتهت الفترة التجريبية المجانية الخاصة بك (7 أيام).' : 'Your free trial period (7 days) has concluded.'}</span>
+            <span>{isRtl ? 'لقد انتهت الفترة التجريبية المجانية الخاصة بك (14 يوم).' : 'Your free trial period (14 days) has concluded.'}</span>
           </div>
         )}
 

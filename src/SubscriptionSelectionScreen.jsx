@@ -185,7 +185,7 @@ export default function SubscriptionSelectionScreen({ onSelectPlan, onLogout, la
             <div className="space-y-5">
               <div>
                 <h3 className="font-black text-[#1e293b] text-lg uppercase tracking-wide">
-                  {isRtl ? 'فترة تجريبية 7 أيام' : '7-Day Free Trial'}
+                  {isRtl ? 'فترة تجريبية 14 يوم' : '14-Day Free Trial'}
                 </h3>
                 <p className="text-[#64748b] text-xs font-medium mt-1">
                   {isRtl ? 'تجربة آمنة بكامل الصلاحيات، لا تطلب بطاقة ائتمان' : 'Full access, no credit card required.'}

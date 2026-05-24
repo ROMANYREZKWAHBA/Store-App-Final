@@ -194,7 +194,7 @@ export default function LandingPage({ onLogin, onGetStarted, language, setLangua
               className="e-btn-primary px-8 py-4 rounded-xl font-black text-base w-full sm:w-auto"
               style={{ minWidth: 220, boxShadow: '0 4px 20px rgba(30,64,175,0.3)' }}
             >
-              🚀 {isRtl ? 'ابدأ التجربة المجانية 7 أيام' : 'Start 7-Day Free Trial'}
+              🚀 {isRtl ? 'ابدأ التجربة المجانية 14 يوم' : 'Start 14-Day Free Trial'}
             </button>
             <button
               onClick={onLogin}
@@ -298,8 +298,8 @@ export default function LandingPage({ onLogin, onGetStarted, language, setLangua
           </h2>
           <p className="text-blue-200 font-medium mb-8" style={{ lineHeight: 1.7 }}>
             {isRtl
-              ? 'ابدأ فترة تجريبية مجانية لمدة 7 أيام. لا توجد رسوم مخفية، لا حاجة لبطاقة.'
-              : 'Start your 7-day free trial today. No hidden fees, no credit card required.'}
+              ? 'ابدأ فترة تجريبية مجانية لمدة 14 يوم. لا توجد رسوم مخفية، لا حاجة لبطاقة.'
+              : 'Start your 14-day free trial today. No hidden fees, no credit card required.'}
           </p>
           <button
             onClick={onGetStarted}

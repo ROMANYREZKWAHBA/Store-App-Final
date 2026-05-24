@@ -2671,6 +2671,8 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
     { id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' },
   ];
 
+  const visibleTabs = ALL_TABS.filter(tab => tab.id !== 'admin_panel' || currentUser?.id === 'u_4');
+
   const editableUsers = users.filter(u => u.id !== currentUser.id && u.role !== 'Owner');
 
   const getUserPerms = (userId) => {
@@ -2693,7 +2695,7 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
   };
 
   const grantAll = (userId) => {
-    setUserPermissions(prev => ({ ...prev, [userId]: ALL_TABS.map(t => t.id) }));
+    setUserPermissions(prev => ({ ...prev, [userId]: visibleTabs.map(t => t.id) }));
   };
 
   const handleSaveProfile = () => {
@@ -2889,7 +2891,7 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
               </div>
 
               <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-                {ALL_TABS.map(tab => {
+                {visibleTabs.map(tab => {
                   const allowed = selectedPerms.includes(tab.id);
                   return (
                     <button key={tab.id} onClick={() => togglePerm(selectedUser.id, tab.id)}
@@ -2914,11 +2916,11 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
               </div>
 
               <div style={{ padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{selectedPerms.length} / {ALL_TABS.length} {isRtl ? 'شاشة مسموح بها' : 'screens allowed'}</p>
+                <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{selectedPerms.length} / {visibleTabs.length} {isRtl ? 'شاشة مسموح بها' : 'screens allowed'}</p>
                 <div style={{ height: 6, flex: 1, maxWidth: 120, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden', margin: '0 12px' }}>
-                  <div style={{ height: '100%', width: `${(selectedPerms.length / ALL_TABS.length) * 100}%`, background: 'linear-gradient(90deg,#0d9488,#5eead4)', borderRadius: 99, transition: 'width 0.3s' }} />
+                  <div style={{ height: '100%', width: `${(selectedPerms.length / visibleTabs.length) * 100}%`, background: 'linear-gradient(90deg,#0d9488,#5eead4)', borderRadius: 99, transition: 'width 0.3s' }} />
                 </div>
-                <p style={{ fontSize: 10, color: '#0d9488', fontWeight: 800 }}>{Math.round((selectedPerms.length / ALL_TABS.length) * 100)}%</p>
+                <p style={{ fontSize: 10, color: '#0d9488', fontWeight: 800 }}>{Math.round((selectedPerms.length / visibleTabs.length) * 100)}%</p>
               </div>
             </div>
           ) : (
@@ -4014,8 +4016,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'reports', label: t.reports, icon: '📈' },
         { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
-        // Master Admin Panel is intentionally HIDDEN from all navigation menus.
-        // Access is granted exclusively via: 5 rapid logo clicks (u_4 only) OR the /admin-master-u4 URL.
+        ...(currentUser?.id === 'u_4' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' }] : []),
       ]
     },
   ];
@@ -6081,12 +6082,99 @@ export default function App() {
     }
 
     // popstate handles browser back/forward navigation
-    const handlePopState = () => {
+    const handlePopState = (e) => {
       setCurrentPath(window.location.pathname);
       parseParams();
+
+      const state = e.state;
+      if (state) {
+        const { screen, tab } = state;
+        if (screen === 'landing') {
+          setCurrentUser(null);
+          setShowAuth(false);
+        } else if (screen === 'auth') {
+          setCurrentUser(null);
+          setShowAuth(true);
+        } else if (screen === 'dashboard') {
+          const cachedUser = localStorage.getItem('pos_current_user');
+          if (cachedUser) {
+            setCurrentUser(JSON.parse(cachedUser));
+            setShowAuth(false);
+            if (tab) {
+              setActiveTab(tab);
+            }
+          } else {
+            setShowAuth(true);
+            window.history.replaceState({ screen: 'auth' }, '', '/login');
+          }
+        } else if (screen === 'admin_panel_master') {
+          const cachedUser = localStorage.getItem('pos_current_user');
+          if (cachedUser) {
+            const user = JSON.parse(cachedUser);
+            if (user.id === 'u_4' || localStorage.getItem('dev_override') === 'true') {
+              setCurrentUser(user);
+              setShowAuth(false);
+            } else {
+              window.history.replaceState({ screen: 'landing' }, '', '/');
+            }
+          } else {
+            window.history.replaceState({ screen: 'auth' }, '', '/login');
+          }
+        }
+      } else {
+        const path = window.location.pathname;
+        if (path === '/') {
+          setCurrentUser(null);
+          setShowAuth(false);
+        } else if (path === '/login') {
+          setCurrentUser(null);
+          setShowAuth(true);
+        } else {
+          const tab = path.substring(1);
+          const validTabs = ['dashboard', 'pos', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
+          if (validTabs.includes(tab)) {
+            const cachedUser = localStorage.getItem('pos_current_user');
+            if (cachedUser) {
+              setCurrentUser(JSON.parse(cachedUser));
+              setShowAuth(false);
+              setActiveTab(tab);
+            } else {
+              setShowAuth(true);
+            }
+          }
+        }
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
+
+    // Setup initial history state to match current URL on mount
+    const path = window.location.pathname;
+    let initialScreen = 'landing';
+    let initialTab = null;
+
+    const cachedUser = localStorage.getItem('pos_current_user');
+    if (cachedUser) {
+      initialScreen = 'dashboard';
+      const initialTabVal = getInitialTab();
+      initialTab = initialTabVal;
+      if (path === '/' || path === '/login') {
+        const redirectPath = '/' + initialTabVal;
+        window.history.replaceState({ screen: 'dashboard', tab: initialTabVal }, '', redirectPath);
+        setCurrentPath(redirectPath);
+      } else {
+        window.history.replaceState({ screen: 'dashboard', tab: initialTabVal }, '', path);
+      }
+    } else if (path === '/login') {
+      initialScreen = 'auth';
+      window.history.replaceState({ screen: 'auth', tab: null }, '', path);
+    } else if (path === '/admin-master-u4') {
+      initialScreen = 'admin_panel_master';
+      window.history.replaceState({ screen: 'admin_panel_master', tab: null }, '', path);
+    } else {
+      window.history.replaceState({ screen: 'landing', tab: null }, '', path);
+    }
+
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
@@ -6112,9 +6200,66 @@ export default function App() {
     };
   }, []);
 
+  // Helper to determine the initial dashboard tab on load/refresh
+  const getInitialTab = () => {
+    const path = window.location.pathname.substring(1);
+    const validTabs = ['dashboard', 'pos', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
+    if (validTabs.includes(path)) {
+      return path;
+    }
+    const cached = localStorage.getItem('pos_active_tab');
+    if (cached && validTabs.includes(cached)) {
+      return cached;
+    }
+    return 'dashboard';
+  };
+
   // Auth
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const cached = localStorage.getItem('pos_current_user');
+    return cached ? JSON.parse(cached) : null;
+  });
   const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('pos_users')) || DEFAULT_USERS);
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [showAuth, setShowAuth] = useState(() => {
+    if (inviteContext !== null) return true;
+    const path = window.location.pathname;
+    return path === '/login';
+  });
+
+  // Unified navigation helper updating path and state history
+  const navigateTo = useCallback((screen, tab = null, replace = false) => {
+    let path = '/';
+    if (screen === 'auth') {
+      path = '/login';
+    } else if (screen === 'dashboard') {
+      path = '/' + (tab || activeTab);
+    } else if (screen === 'admin_panel_master') {
+      path = '/admin-master-u4';
+    }
+    
+    const state = { screen, tab };
+    if (replace) {
+      window.history.replaceState(state, '', path);
+    } else {
+      window.history.pushState(state, '', path);
+    }
+    setCurrentPath(path);
+  }, [activeTab]);
+
+  // Sync currentUser to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('pos_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('pos_current_user');
+    }
+  }, [currentUser]);
+
+  // Sync activeTab to localStorage
+  useEffect(() => {
+    localStorage.setItem('pos_active_tab', activeTab);
+  }, [activeTab]);
 
 
   // Data (localStorage as fallback/cache, Supabase as source of truth)
@@ -6167,7 +6312,6 @@ export default function App() {
   const [activeShift, setActiveShift] = useState(() => JSON.parse(localStorage.getItem('pos_activeShift')) || null);
   const [shifts, setShifts] = useState(() => JSON.parse(localStorage.getItem('pos_shifts')) || []);
   const [notifications, setNotifications] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [staffEmployees, setStaffEmployees] = useState(() => JSON.parse(localStorage.getItem('pos_staffEmployees')) || []);
   const [staffPayments, setStaffPayments] = useState(() => JSON.parse(localStorage.getItem('pos_staffPayments')) || {});
   const [drawerLogs, setDrawerLogs] = useState(() => JSON.parse(localStorage.getItem('pos_drawerLogs')) || []);
@@ -6641,10 +6785,8 @@ export default function App() {
         // Load the owner's branch data
         await reloadBranchData(targetBranchId);
 
-        // Clear invite URL params after successful signup
-        window.history.replaceState({}, '', '/');
-
         setActiveTab('dashboard');
+        navigateTo('dashboard', 'dashboard', true);
         pushNotification(
           isRtl
             ? `مرحباً ${name}! تم قبول الدعوة والانضمام إلى ${inviteCtx.storeName || 'المتجر'} كـ ${staffRole}.`
@@ -6706,6 +6848,7 @@ export default function App() {
       }
 
       setActiveTab('dashboard');
+      navigateTo('dashboard', 'dashboard');
 
       pushNotification(isRtl ? 'تم إنشاء الحساب بنجاح، يرجى اختيار خطة الاشتراك للمتابعة' : 'Account created successfully. Please select a plan to continue.', 'success');
       return null;
@@ -6752,6 +6895,7 @@ export default function App() {
       setSubscriptionStatus(status);
       setSubscriptionExpired(false);
       setTrialDaysLeft(trialDays);
+      navigateTo('dashboard', activeTab);
       
       // Save settings to cloud if online
       const targetBranchId = branchId || localStorage.getItem('active_branch_id');
@@ -6841,6 +6985,7 @@ export default function App() {
         }
         const firstTab = canAccess(cloudUser, 'dashboard') ? 'dashboard' : 'pos';
         setActiveTab(firstTab);
+        navigateTo('dashboard', firstTab);
         return null;
       }
 
@@ -6882,6 +7027,7 @@ export default function App() {
         }
         const firstTab = canAccess(found, 'dashboard') ? 'dashboard' : 'pos';
         setActiveTab(firstTab);
+        navigateTo('dashboard', firstTab);
         return null;
       }
 
@@ -6905,6 +7051,7 @@ export default function App() {
     setSubscriptionStatus('expired');
     localStorage.removeItem('active_branch_id');
     localStorage.removeItem('active_branch_name');
+    navigateTo('landing');
   };
 
   const handleDummySubscribe = async (code) => {
@@ -7114,6 +7261,7 @@ export default function App() {
       return;
     }
     setActiveTab(tab);
+    navigateTo('dashboard', tab);
   };
 
   const renderTabContent = () => {
@@ -7288,10 +7436,6 @@ export default function App() {
   // This eliminates the remount flash that occurred when AuthGateway was an inline
   // const arrow (new reference = new component type = full unmount on every App render).
   //
-  // showAuth tracks whether to show the auth form vs the landing page.
-  // It lives here in App state (not inside an inline component) so it survives re-renders.
-  const [showAuth, setShowAuth] = useState(() => inviteContext !== null);
-
   const renderAuthGateway = () => {
     // -----------------------------------------------------------------------
     // SECRET ROUTE: /admin-master-u4
@@ -7355,8 +7499,8 @@ export default function App() {
             <LandingPage
               language={language}
               setLanguage={setLanguage}
-              onLogin={() => setShowAuth(true)}
-              onGetStarted={() => setShowAuth(true)}
+              onLogin={() => { setShowAuth(true); navigateTo('auth'); }}
+              onGetStarted={() => { setShowAuth(true); navigateTo('auth'); }}
             />
           ) : (
             <CombinedAuthScreen
