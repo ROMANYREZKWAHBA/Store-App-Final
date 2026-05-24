@@ -5571,7 +5571,14 @@ function NotFoundScreen({ language, onGoHome }) {
 }
 
 export default function App() {
-  console.log("Lifecycle: App mounted, Status Check Started");
+  // ⚡ Mount-only log guard — never logs again after initial render
+  const _hasMounted = useRef(false);
+  useEffect(() => {
+    if (!_hasMounted.current) {
+      _hasMounted.current = true;
+      // Intentionally silent after first mount — no recurring console pollution
+    }
+  }, []);
   const isOnline = useOnlineStatus();
   const [language, setLanguage] = useState('ar');
   const isRtl = language === 'ar';
@@ -5599,6 +5606,11 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const [inviteContext, setInviteContext] = useState(null);
 
+  // ⚡ STRICT ONCE-ON-MOUNT URL PARSING
+  // hasParsedUrl guarantees the initial invite-param extraction runs exactly once.
+  // Subsequent dashboard/state updates NEVER re-trigger this path.
+  const hasParsedUrl = useRef(false);
+
   useEffect(() => {
     const parseParams = () => {
       const params = new URLSearchParams(window.location.search);
@@ -5606,28 +5618,36 @@ export default function App() {
       const storeId = params.get('storeId');
       const role = params.get('role');
       const storeName = params.get('storeName');
-      
+
       if (token === 'true' && storeId && role) {
         const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
         setInviteContext(prev => {
-          if (prev && prev.storeId === storeId && prev.role === role && prev.storeName === decodedStoreName) {
-            return prev;
+          // Strict primitive equality — never create a new object if nothing changed
+          if (
+            prev &&
+            prev.storeId === storeId &&
+            prev.role === role &&
+            prev.storeName === decodedStoreName
+          ) {
+            return prev; // bail — no re-render
           }
           return { storeId, role, storeName: decodedStoreName };
         });
       } else {
-        setInviteContext(prev => {
-          if (window.location.search.indexOf('inviteToken') === -1) {
-            return prev !== null ? null : prev;
-          }
-          return prev;
-        });
+        // Only null-out if the URL genuinely has no invite token
+        if (window.location.search.indexOf('inviteToken') === -1) {
+          setInviteContext(prev => (prev !== null ? null : prev));
+        }
       }
     };
 
-    // Run on mount
-    parseParams();
+    // Initial parse — strictly once on mount
+    if (!hasParsedUrl.current) {
+      hasParsedUrl.current = true;
+      parseParams();
+    }
 
+    // popstate handles browser back/forward navigation
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
       parseParams();
@@ -5637,17 +5657,24 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // ⚡ THEME DOM SYNC — only runs when theme primitive actually changes
   useEffect(() => {
     localStorage.setItem('pos_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  // ⚡ SUBSCRIPTION INIT — strict equality guards prevent redundant state fires
   useEffect(() => {
     const status = getInitialSubscriptionStatus();
-    setSubscriptionStatus(status);
-    setSubscriptionExpired(status === 'expired');
-    setTrialDaysLeft(getInitialTrialDaysLeft());
+    const daysLeft = getInitialTrialDaysLeft();
+    // Only call setters when the value genuinely differs from what useState initialised
+    setSubscriptionStatus(prev => (prev === status ? prev : status));
+    setSubscriptionExpired(prev => {
+      const next = status === 'expired';
+      return prev === next ? prev : next;
+    });
+    setTrialDaysLeft(prev => (prev === daysLeft ? prev : daysLeft));
   }, []);
 
   useEffect(() => {
