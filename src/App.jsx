@@ -65,6 +65,11 @@ globalStyle.textContent = `
   * { scrollbar-width: thin; scrollbar-color: #444 var(--bg-deep); }
   html, body, #root { background: var(--bg-main); color: var(--text-primary); line-height: 1.5; }
   [dir="rtl"] body, [dir="rtl"] #root { line-height: 1.7; }
+
+  /* ⚡ BOOT PAINT SUPPRESSION — prevents white-flash before spinner mounts.
+     Class is added by bootFromCloud() and removed once boot resolves. */
+  body.sp-booting { visibility: hidden; }
+  body.sp-booting-ready { visibility: visible; }
   input[type=number]::-webkit-inner-spin-button { display: none; }
   button:focus { outline: none; }
   
@@ -5592,11 +5597,12 @@ export default function App() {
   const [subscriptionStatus, setSubscriptionStatus] = useState(getInitialSubscriptionStatus);
   const [subscriptionExpired, setSubscriptionExpired] = useState(() => getInitialSubscriptionStatus() === 'expired');
   const [trialDaysLeft, setTrialDaysLeft] = useState(getInitialTrialDaysLeft);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(() => {
-    const status = localStorage.getItem('subscriptionStatus') || localStorage.getItem('pos_subscription_status');
-    // If status is not found or expired, we must hold the loader immediately
-    return true;
-  });
+  // ⚡ BOOT PHASE STATE MACHINE
+  // 'booting' → Supabase fetch in progress (spinner visible, viewport suppressed)
+  // 'ready'   → Boot resolved (AuthGateway visible)
+  // This replaces the old isCheckingStatus boolean which was always `true` on init
+  // and caused a guaranteed extra render before any meaningful content appeared.
+  const [bootPhase, setBootPhase] = useState('booting');
   const subscriptionActive = !subscriptionExpired;
 
   // =========================================================================
@@ -5664,18 +5670,11 @@ export default function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  // ⚡ SUBSCRIPTION INIT — strict equality guards prevent redundant state fires
-  useEffect(() => {
-    const status = getInitialSubscriptionStatus();
-    const daysLeft = getInitialTrialDaysLeft();
-    // Only call setters when the value genuinely differs from what useState initialised
-    setSubscriptionStatus(prev => (prev === status ? prev : status));
-    setSubscriptionExpired(prev => {
-      const next = status === 'expired';
-      return prev === next ? prev : next;
-    });
-    setTrialDaysLeft(prev => (prev === daysLeft ? prev : daysLeft));
-  }, []);
+  // ⚡ SUBSCRIPTION INIT NOTE:
+  // The useState lazy initializers on lines 5592–5594 already call
+  // getInitialSubscriptionStatus() and getInitialTrialDaysLeft() synchronously.
+  // A useEffect that repeats this work is redundant and guarantees a second render.
+  // Removed — no replacement needed.
 
   useEffect(() => {
     window.toggleTheme = () => {
@@ -5756,6 +5755,13 @@ export default function App() {
   // =========================================================================
   useEffect(() => {
     let cancelled = false;
+    // Suppress browser paint during boot to eliminate the white-flash artifact.
+    // A 4-second safety timeout ensures visibility is always restored.
+    document.body.classList.add('sp-booting');
+    const paintSafetyTimer = setTimeout(() => {
+      document.body.classList.remove('sp-booting');
+    }, 4000);
+
     async function bootFromCloud() {
       try {
         // Get or create branch (use machine-id from Electron, fallback to localStorage fingerprint)
@@ -5876,10 +5882,15 @@ export default function App() {
           console.log('☁️ No machine branch resolved — login will handle branch assignment');
         }
 
-        // Mark cloud as ready regardless — login flow can operate independently
-        setCloudReady(true);
+        // Mark cloud as ready regardless — login flow can operate independently.
+        // ⚡ ATOMIC TRANSITION: setCloudReady + setBootPhase in same synchronous
+        // block so React batches them into a single re-render. No transitional
+        // state where cloudReady=true but bootPhase='booting' can escape.
         if (!cancelled) {
-          setIsCheckingStatus(false);
+          clearTimeout(paintSafetyTimer);
+          document.body.classList.remove('sp-booting');
+          setCloudReady(true);
+          setBootPhase('ready');
         }
       } catch (err) {
         console.error('❌ Cloud boot failed, using local cache. Details:', err);
@@ -5896,15 +5907,22 @@ export default function App() {
           setSubscriptionExpired(false);
           localStorage.setItem('pos_subscription_status', saas.status);
         }
-        // Still mark as ready so login isn't blocked
-        setCloudReady(true);
+        // Still mark as ready so login isn't blocked.
+        // ⚡ Same atomic transition as the success path.
         if (!cancelled) {
-          setIsCheckingStatus(false);
+          clearTimeout(paintSafetyTimer);
+          document.body.classList.remove('sp-booting');
+          setCloudReady(true);
+          setBootPhase('ready');
         }
       }
     }
     bootFromCloud();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(paintSafetyTimer);
+      document.body.classList.remove('sp-booting');
+    };
   }, []);
 
   // =========================================================================
@@ -6678,113 +6696,127 @@ export default function App() {
     }
   };
 
-  const Dashboard = () => {
-    const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
-    const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
-    const localSubEnd = localStorage.getItem('pos_subscription_end_date');
-    const saas = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
-    const daysLeft = saas.daysLeft;
+  // ⚡ STABLE DASHBOARD RENDER
+  // Previously `const Dashboard = () => {...}` was defined as an inline arrow
+  // inside App(). React uses referential identity to distinguish component types:
+  // a new function reference on every render = React thinks it's a different
+  // component = full unmount + remount + visible flash on every App re-render.
+  //
+  // Fix: renderDashboard() is a plain render function (not a component). It returns
+  // JSX directly — no React component boundary, no identity tracking, no remount.
+  // The useEffect for expiry checking moves up to App level where it belongs.
+  const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
+  const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
+  const localSubEnd = localStorage.getItem('pos_subscription_end_date');
+  const dashSaas = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
+  const dashDaysLeft = dashSaas.daysLeft;
 
-    useEffect(() => {
-      if (daysLeft !== null && daysLeft <= 0) {
-        localStorage.setItem('pos_subscription_status', 'expired');
-        setSubscriptionStatus('expired');
-        setSubscriptionExpired(true);
-      }
-    }, [daysLeft]);
+  // Expiry check — runs at App level so it doesn't trigger a child remount
+  useEffect(() => {
+    if (dashDaysLeft !== null && dashDaysLeft <= 0) {
+      localStorage.setItem('pos_subscription_status', 'expired');
+      setSubscriptionStatus('expired');
+      setSubscriptionExpired(true);
+    }
+  }, [dashDaysLeft]);
 
-    return (
-      <div className="flex h-screen w-screen transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
-        
-        {/* Offline Warning Banner */}
-        {!isOnline && (
-          <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
-            ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
-          </div>
-        )}
+  const renderDashboard = () => (
+    <div className="flex h-screen w-screen transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
 
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={handleSetActiveTab}
-          onLogout={handleLogout}
-          user={currentUser}
+      {/* Offline Warning Banner */}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white text-center py-2 text-xs font-black uppercase tracking-widest animate-pulse">
+          ⚠️ {isRtl ? 'لا يوجد اتصال بالإنترنت — لن تتم المزامنة حتى يعود الاتصال' : 'No Internet Connection — Data will not sync until reconnected'}
+        </div>
+      )}
+
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={handleSetActiveTab}
+        onLogout={handleLogout}
+        user={currentUser}
+        language={language}
+        setLanguage={setLanguage}
+        userPermissions={userPermissions}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        activeBranchName={activeBranchName}
+        theme={theme}
+      />
+
+      <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
+        <SubscriptionWarningBanner
+          daysLeft={dashDaysLeft}
+          onRenew={() => {
+            localStorage.setItem('pos_subscription_status', 'pending_onboarding');
+            setSubscriptionStatus('pending_onboarding');
+          }}
           language={language}
-          setLanguage={setLanguage}
-          userPermissions={userPermissions}
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-          activeBranchName={activeBranchName}
-          theme={theme}
         />
 
-        <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
-          <SubscriptionWarningBanner
-            daysLeft={daysLeft}
-            onRenew={() => {
-              localStorage.setItem('pos_subscription_status', 'pending_onboarding');
-              setSubscriptionStatus('pending_onboarding');
-            }}
-            language={language}
-          />
-          
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', padding: '0 24px', height: 60, flexShrink: 0, zIndex: 10, position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 3, height: 20, background: 'var(--accent-blue)', borderRadius: 99 }} />
-              <h1 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '0.2px' }}>
-                {T[language][activeTab] || activeTab}
-              </h1>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {activeBranchName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue-light)', padding: '5px 12px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontSize: 12 }}>🏢</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>{activeBranchName}</span>
-                </div>
-              )}
-              {branchId && (
-                <button
-                  onClick={handleManualSync}
-                  disabled={isSyncing}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'var(--bg-deep)', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', opacity: isSyncing ? 0.6 : 1 }}
-                  title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
-                  onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent-blue)'; e.currentTarget.style.background = 'var(--accent-blue-light)'; }}
-                  onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'var(--bg-deep)'; }}
-                >
-                  <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={{ color: isSyncing ? 'var(--accent-blue)' : 'var(--text-secondary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                    <path d="M16 21v-5h5" />
-                  </svg>
-                </button>
-              )}
-              {activeShift && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0fdf4', padding: '5px 12px', borderRadius: 20, border: '1px solid #bbf7d0' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>{isRtl ? 'وردية نشطة' : 'Live Session'}</span>
-                </div>
-              )}
-            </div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', padding: '0 24px', height: 60, flexShrink: 0, zIndex: 10, position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 3, height: 20, background: 'var(--accent-blue)', borderRadius: 99 }} />
+            <h1 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '0.2px' }}>
+              {T[language][activeTab] || activeTab}
+            </h1>
           </div>
-
-          <div className="flex-1 overflow-y-auto transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }}>
-            {renderTabContent()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {activeBranchName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent-blue-light)', padding: '5px 12px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: 12 }}>🏢</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-blue)' }}>{activeBranchName}</span>
+              </div>
+            )}
+            {branchId && (
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'var(--bg-deep)', border: '1px solid var(--border-color)', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', opacity: isSyncing ? 0.6 : 1 }}
+                title={isRtl ? 'مزامنة البيانات' : 'Sync Data'}
+                onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent-blue)'; e.currentTarget.style.background = 'var(--accent-blue-light)'; }}
+                onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'var(--bg-deep)'; }}
+              >
+                <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} style={{ color: isSyncing ? 'var(--accent-blue)' : 'var(--text-secondary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 21v-5h5" />
+                </svg>
+              </button>
+            )}
+            {activeShift && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0fdf4', padding: '5px 12px', borderRadius: 20, border: '1px solid #bbf7d0' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>{isRtl ? 'وردية نشطة' : 'Live Session'}</span>
+              </div>
+            )}
           </div>
-        </main>
+        </div>
 
-        <NotificationOverlay
-          notifications={notifications}
-          onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
-        />
-      </div>
-    );
-  };
+        <div className="flex-1 overflow-y-auto transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }}>
+          {renderTabContent()}
+        </div>
+      </main>
 
-  const AuthGateway = () => {
-    // If invite context is present, skip landing page and go straight to signup
-    const [showAuth, setShowAuth] = useState(() => inviteContext !== null);
+      <NotificationOverlay
+        notifications={notifications}
+        onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))}
+      />
+    </div>
+  );
 
+  // ⚡ STABLE AUTH GATEWAY RENDER
+  // Same pattern as renderDashboard — a plain render function, not a React component.
+  // This eliminates the remount flash that occurred when AuthGateway was an inline
+  // const arrow (new reference = new component type = full unmount on every App render).
+  //
+  // showAuth tracks whether to show the auth form vs the landing page.
+  // It lives here in App state (not inside an inline component) so it survives re-renders.
+  const [showAuth, setShowAuth] = useState(() => inviteContext !== null);
+
+  const renderAuthGateway = () => {
     // -----------------------------------------------------------------------
     // SECRET ROUTE: /admin-master-u4
     // -----------------------------------------------------------------------
@@ -6898,38 +6930,42 @@ export default function App() {
       );
     }
 
-    // 4. Default -> Dashboard
-    return <Dashboard />;
+    // 4. Default -> Main Dashboard
+    return renderDashboard();
   };
 
   const t = T[language];
 
   return (
-    isCheckingStatus ? (
-      <>
-        {console.log("Lifecycle: App rendered, Status:", isCheckingStatus)}
-        <div className="login-rounded flex h-screen w-screen items-center justify-center bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
-              <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
-              <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
-                <span className="text-[10px]">⚡</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
-                {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
-              </h2>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
-                {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
-              </p>
+    bootPhase === 'booting' ? (
+      // ⚡ BOOT SPINNER
+      // Shown while Supabase resolves. The body.sp-booting CSS class (added at boot
+      // start) suppresses the browser paint entirely until this spinner is in the DOM,
+      // preventing any white/wrong-layout flash before the first meaningful frame.
+      <div className="login-rounded flex h-screen w-screen items-center justify-center bg-[#0a0a0c]" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 border-2 border-[#D4AF37]/10 login-rounded rounded-full"></div>
+            <div className="absolute inset-0 border-2 border-t-[#D4AF37] border-r-transparent border-b-transparent border-l-transparent login-rounded rounded-full animate-spin"></div>
+            <div className="absolute inset-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 login-rounded rounded-full animate-pulse flex items-center justify-center">
+              <span className="text-[10px]">⚡</span>
             </div>
           </div>
+          <div className="flex flex-col items-center gap-2">
+            <h2 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+              {isRtl ? 'بوابة التحقق الآمنة' : 'Secure Verification Gate'}
+            </h2>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse text-center">
+              {isRtl ? 'جاري فحص صلاحية الاشتراك والتراخيص...' : 'Verifying subscription credentials...'}
+            </p>
+          </div>
         </div>
-      </>
+      </div>
     ) : (
-      <AuthGateway />
+      // ⚡ AUTH GATEWAY — rendered as a plain render function call (not a JSX component)
+      // so React has no component identity to track, meaning no unmount/remount flash
+      // when App state changes.
+      renderAuthGateway()
     )
   );
 }
