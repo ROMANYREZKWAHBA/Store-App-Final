@@ -304,7 +304,7 @@ function ModifierModal({ item, onClose, language, onAdd }) {
   const [selectedSize, setSelectedSize] = useState(item.sizes[0]);
   const [selectedMods, setSelectedMods] = useState([]);
   const [note, setNote] = useState('');
-  const t = T[language];
+  const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
   const groups = ['Milk', 'Sugar', 'Flavor'];
@@ -345,7 +345,7 @@ function ModifierModal({ item, onClose, language, onAdd }) {
           </div>
 
           {groups.map(group => {
-            const groupMods = MODIFIERS.filter(m => m.group === group && item.modifiers.includes(m.id));
+            const groupMods = getModifiers().filter(m => m.group === group && item.modifiers.includes(m.id));
             if (!groupMods.length) return null;
             return (
               <div key={group}>
@@ -396,7 +396,7 @@ function CartPanel({ cart, setCart, customers, items, orderType, currentUser, on
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newCustName, setNewCustName] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
-  const t = T[language];
+  const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.priceAtOrder * i.quantity, 0), [cart]);
@@ -620,7 +620,7 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
 
   const [lastInvoice, setLastInvoice] = useState(null);
   const [isCheckoutRequested, setIsCheckoutRequested] = useState(false);
-  const t = T[language];
+  const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
   // ============================================================
@@ -867,7 +867,7 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
 // DASHBOARD
 // ============================================================
 function DashboardTab({ items, orders, customers, expenses, purchases, customerPayments, cashboxLog, activeShift, users, language }) {
-  const t = T[language];
+  const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
   const getLocalDateKey = (d) => {
@@ -1700,7 +1700,7 @@ function SalesScreen({ orders, users, customers, language, onVoidOrder, currency
 
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const statusColors = { PAID: 'bg-emerald-100 text-[#0066FF]', PARTIALLY_PAID: 'bg-amber-100 text-amber-700', UNPAID: 'bg-red-100 text-red-700', VOIDED: 'bg-[var(--bg-deep)] text-[var(--text-muted)]', REFUNDED: 'bg-slate-200 text-slate-500' };
-  const t = T[language];
+  const t = getTranslations()[language];
 
   return (
     <div className="p-6 space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -4122,7 +4122,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
     logoSubText: isDark ? '#60a5fa'  : '#1e40af',
   };
 
-  const t = T[language];
+  const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
   // Secret logo click counter for u_4 developer access
@@ -8068,7 +8068,7 @@ export default function App() {
       
       // Step 3.5: Hard Fallback to structural DEFAULT_USERS if Incognito/Schema error blocked user load
       if (!found) {
-        found = DEFAULT_USERS.find(u => u.username === id && u.password === pwd);
+        found = getDefaultUsers().find(u => u.username === id && u.password === pwd);
       }
       
       if (found && found.isActive) {
@@ -8347,7 +8347,7 @@ export default function App() {
       case 'drawer': return <DrawerScreen activeShift={activeShift} drawerBalance={drawerBalance} setDrawerBalance={setDrawerBalance} setMainSafeBalance={setMainSafeBalance} drawerLogs={drawerLogs} setDrawerLogs={setDrawerLogs} currency={currency} isRtl={isRtl} setCashLog={setCashLog} currentUser={currentUser} />;
       case 'shifts': return <ShiftScreen activeShift={activeShift} shifts={shifts} onOpenShift={handleOpenShift} onCloseShift={handleCloseShift} currentUser={currentUser} language={language} users={users} orders={orders} expenses={expenses} onLogout={handleLogout} storeName={storeName} currency={currency} drawerLogs={drawerLogs} />;
       case 'sales': return <SalesScreen orders={orders} users={users} customers={customers} language={language} onVoidOrder={handleVoidOrder} currency={currency} storeName={storeName} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} activeShift={activeShift} />;
-      case 'inventory': return <InventoryScreen items={calculatedItems} categories={categories} modifiers={MODIFIERS} onAddCategory={c => setCategories(p => [...p, c])} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} language={language} />;
+      case 'inventory': return <InventoryScreen items={calculatedItems} categories={categories} modifiers={getModifiers()} onAddCategory={c => setCategories(p => [...p, c])} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} language={language} />;
       case 'customers': return <CustomersScreen customers={customers} orders={orders} customerPayments={customerPayments} onAddCustomer={handleAddCustomer} onAddCustomerPayment={handleAddCustomerPayment} language={language} />;
       case 'expenses': return <ExpensesScreen expenses={expenses} onAddExpense={handleAddExpense} currentUser={currentUser} activeShift={activeShift} language={language} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'settings': return <SettingsScreen currentUser={currentUser} users={users} language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} onUpdateUser={handleUpdateUser} userPermissions={userPermissions} setUserPermissions={setUserPermissions} storeName={storeName} setStoreName={setStoreName} currency={currency} setCurrency={setCurrency} taxRate={taxRate} setTaxRate={setTaxRate} enableServiceFee={enableServiceFee} setEnableServiceFee={setEnableServiceFee} serviceFee={serviceFee} setServiceFee={setServiceFee} pushNotification={pushNotification} invoiceLogo={invoiceLogo} setInvoiceLogo={setInvoiceLogo} invoiceHeader={invoiceHeader} setInvoiceHeader={setInvoiceHeader} invoiceFooter={invoiceFooter} setInvoiceFooter={setInvoiceFooter} customRoles={customRoles} setCustomRoles={setCustomRoles} />;
@@ -8458,7 +8458,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 3, height: 20, background: 'var(--accent-blue)', borderRadius: 99 }} />
             <h1 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '0.2px' }}>
-              {T[language][activeTab] || activeTab}
+              {getTranslations()[language][activeTab] || activeTab}
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -8642,7 +8642,7 @@ export default function App() {
     return renderDashboard();
   };
 
-  const t = T[language];
+  const t = getTranslations()[language];
 
   return (
     bootPhase === 'booting' ? (
