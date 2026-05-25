@@ -3108,7 +3108,7 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
 // ============================================================
 // COMBINED AUTH SCREEN (SIGN IN / SIGN UP)
 // ============================================================
-function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, onUpdateUser, inviteContext }) {
+function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, onUpdateUser, inviteContext, theme, setTheme }) {
   // Default to 'signup' when coming from an invitation link
   const [authMode, setAuthMode] = useState(() => inviteContext ? 'signup' : 'login');
   const [selectedRole, setSelectedRole] = useState('Cashier');
@@ -7569,6 +7569,8 @@ export default function App() {
               users={users}
               onUpdateUser={handleUpdateUser}
               inviteContext={inviteContext}
+              theme={theme}
+              setTheme={setTheme}
             />
           )}
           <NotificationOverlay
