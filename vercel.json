@@ -1,5 +1,5 @@
 {
-  "buildCommand": "vite build && npx javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser",
+  "buildCommand": "vite build && node sanitize-build.cjs && npx javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser && node sanitize-build.cjs",
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [

@@ -1,17 +1,16 @@
 {
   "compact": true,
-  "selfDefending": true,
+  "selfDefending": false,
   "controlFlowFlattening": false,
   "deadCodeInjection": false,
   "numbersToExpressions": false,
   "simplify": false,
-  "stringArray": true,
-  "stringArrayRotate": true,
-  "stringArrayShuffle": true,
-  "stringArrayThreshold": 0.75,
-  "stringArrayEncoding": [
-    "base64"
-  ],
+  "disableConsoleOutput": false,
+  "stringArray": false,
+  "stringArrayRotate": false,
+  "stringArrayShuffle": false,
+  "stringArrayThreshold": 0,
+  "stringArrayEncoding": [],
   "renameGlobals": false,
   "unicodeEscapeSequence": false,
   "reservedStrings": [
