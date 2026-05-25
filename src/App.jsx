@@ -12,6 +12,86 @@ import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
 import LandingPage from './LandingPage';
 
+const ROLE_PERMISSIONS = {
+  Owner: ['all'],
+  admin: ['all'],
+  Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
+  Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
+  Cashier: ['pos', 'shifts', 'sales'],
+  Accountant: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'],
+  Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
+};
+
+const DEFAULT_CUSTOM_ROLES = [
+  { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
+  { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
+  { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
+  { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
+  { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
+];
+
+function getRoleName(roleIdOrName) {
+  if (!roleIdOrName) return '';
+  if (roleIdOrName === 'Owner' || roleIdOrName === 'owner') return 'Owner';
+  if (roleIdOrName === 'admin') return 'Admin';
+  let roles = [];
+  try {
+    roles = JSON.parse(localStorage.getItem('pos_custom_roles')) || [];
+  } catch (e) {}
+  if (roles.length === 0) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const match = roles.find(r => r.id === roleIdOrName || r.name === roleIdOrName);
+  return match ? match.name : roleIdOrName;
+}
+
+function isManagerOrAbove(user, customRolesList) {
+  if (!user) return false;
+  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
+  let roles = customRolesList;
+  if (!roles) {
+    try {
+      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
+    } catch (e) {}
+  }
+  if (!roles) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
+  if (dynamicRole) {
+    return dynamicRole.allowedTabs.includes('reports') || dynamicRole.allowedTabs.includes('dashboard') || dynamicRole.allowedTabs.includes('staff');
+  }
+  return user.role !== 'Cashier';
+}
+
+function canAccess(user, tab, customPerms, customRolesList) {
+  if (!user) return false;
+  // Admin Master Panel is exclusively restricted to the System Developer (u_4)
+  if (tab === 'admin_panel') {
+    return user.id === 'u_4';
+  }
+  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
+  // If owner set custom permissions for this user, use those
+  if (customPerms && customPerms[user.id]) {
+    return customPerms[user.id].includes(tab);
+  }
+  let roles = customRolesList;
+  if (!roles) {
+    try {
+      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
+    } catch (e) {}
+  }
+  if (!roles) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
+  if (dynamicRole) {
+    return dynamicRole.allowedTabs.includes(tab);
+  }
+  const perms = ROLE_PERMISSIONS[user.role] || [];
+  return perms.includes(tab);
+}
+
 // Inject Google Fonts
 const styleEl = document.createElement('link');
 styleEl.rel = 'stylesheet';
@@ -277,86 +357,6 @@ const T = {
     addBasket: "إضافة للسلة", PAID: "مدفوع", PARTIALLY_PAID: "مدفوع جزئياً",
     UNPAID: "غير مدفوع", VOIDED: "ملغي",
   }
-};
-
-const ROLE_PERMISSIONS = {
-  Owner: ['all'],
-  admin: ['all'],
-  Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
-  Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
-  Cashier: ['pos', 'shifts', 'sales'],
-  Accountant: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'],
-  Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
-};
-
-const DEFAULT_CUSTOM_ROLES = [
-  { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
-  { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
-  { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
-  { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
-  { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
-];
-
-const getRoleName = (roleIdOrName) => {
-  if (!roleIdOrName) return '';
-  if (roleIdOrName === 'Owner' || roleIdOrName === 'owner') return 'Owner';
-  if (roleIdOrName === 'admin') return 'Admin';
-  let roles = [];
-  try {
-    roles = JSON.parse(localStorage.getItem('pos_custom_roles')) || [];
-  } catch (e) {}
-  if (roles.length === 0) {
-    roles = DEFAULT_CUSTOM_ROLES;
-  }
-  const match = roles.find(r => r.id === roleIdOrName || r.name === roleIdOrName);
-  return match ? match.name : roleIdOrName;
-};
-
-const isManagerOrAbove = (user, customRolesList) => {
-  if (!user) return false;
-  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
-  let roles = customRolesList;
-  if (!roles) {
-    try {
-      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
-    } catch (e) {}
-  }
-  if (!roles) {
-    roles = DEFAULT_CUSTOM_ROLES;
-  }
-  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
-  if (dynamicRole) {
-    return dynamicRole.allowedTabs.includes('reports') || dynamicRole.allowedTabs.includes('dashboard') || dynamicRole.allowedTabs.includes('staff');
-  }
-  return user.role !== 'Cashier';
-};
-
-const canAccess = (user, tab, customPerms, customRolesList) => {
-  if (!user) return false;
-  // Admin Master Panel is exclusively restricted to the System Developer (u_4)
-  if (tab === 'admin_panel') {
-    return user.id === 'u_4';
-  }
-  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
-  // If owner set custom permissions for this user, use those
-  if (customPerms && customPerms[user.id]) {
-    return customPerms[user.id].includes(tab);
-  }
-  let roles = customRolesList;
-  if (!roles) {
-    try {
-      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
-    } catch (e) {}
-  }
-  if (!roles) {
-    roles = DEFAULT_CUSTOM_ROLES;
-  }
-  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
-  if (dynamicRole) {
-    return dynamicRole.allowedTabs.includes(tab);
-  }
-  const perms = ROLE_PERMISSIONS[user.role] || [];
-  return perms.includes(tab);
 };
 
 let appCurrency = 'EGP';
