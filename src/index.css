@@ -21,6 +21,9 @@
   /* ── Borders */
   --border-color: #e2e8f0;
 
+  /* ── Brand Shadows & Aesthetics */
+  --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+
   /* ── Brand Colors */
   --accent-blue:   #1e40af;
   --accent-blue-hover: #1e3a8a;
@@ -32,7 +35,7 @@
   --accent-purple: #1e40af;
 
   /* ── Typography */
-  --text-primary:   #1e293b;
+  --text-primary:   #0f172a;
   --text-secondary: #64748b;
   --text-muted:     #94a3b8;
 
@@ -107,14 +110,26 @@ body[dir="rtl"] {
 .luxury-card {
   background-color: var(--bg-card);
   border-radius: var(--radius-card, 24px) !important;
-  border: 1.5px solid var(--border-color);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(241, 245, 249, 0.8) !important; /* border-slate-100/80 */
+  box-shadow: var(--card-shadow, 0 8px 30px rgba(0, 0, 0, 0.04)) !important;
   overflow: hidden;
-  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.luxury-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important; /* border-amber-500/40 */
 }
 
 [data-theme="dark"] .luxury-card {
+  border: 1px solid var(--border-color) !important;
   box-shadow: 0 12px 40px -15px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .luxury-card:hover {
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.6) !important;
+  border-color: rgba(212, 175, 55, 0.4) !important; /* border-gold-500/40 */
 }
 
 /* Enterprise UI surfaces — allow Tailwind rounded-* classes */

@@ -289,16 +289,71 @@ const ROLE_PERMISSIONS = {
   Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
 };
 
-const canAccess = (user, tab, customPerms) => {
+const DEFAULT_CUSTOM_ROLES = [
+  { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
+  { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
+  { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
+  { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
+  { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
+];
+
+const getRoleName = (roleIdOrName) => {
+  if (!roleIdOrName) return '';
+  if (roleIdOrName === 'Owner' || roleIdOrName === 'owner') return 'Owner';
+  if (roleIdOrName === 'admin') return 'Admin';
+  let roles = [];
+  try {
+    roles = JSON.parse(localStorage.getItem('pos_custom_roles')) || [];
+  } catch (e) {}
+  if (roles.length === 0) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const match = roles.find(r => r.id === roleIdOrName || r.name === roleIdOrName);
+  return match ? match.name : roleIdOrName;
+};
+
+const isManagerOrAbove = (user, customRolesList) => {
+  if (!user) return false;
+  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
+  let roles = customRolesList;
+  if (!roles) {
+    try {
+      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
+    } catch (e) {}
+  }
+  if (!roles) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
+  if (dynamicRole) {
+    return dynamicRole.allowedTabs.includes('reports') || dynamicRole.allowedTabs.includes('dashboard') || dynamicRole.allowedTabs.includes('staff');
+  }
+  return user.role !== 'Cashier';
+};
+
+const canAccess = (user, tab, customPerms, customRolesList) => {
   if (!user) return false;
   // Admin Master Panel is exclusively restricted to the System Developer (u_4)
   if (tab === 'admin_panel') {
     return user.id === 'u_4';
   }
-  if (user.role === 'Owner' || user.role === 'admin') return true;
+  if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
   // If owner set custom permissions for this user, use those
   if (customPerms && customPerms[user.id]) {
     return customPerms[user.id].includes(tab);
+  }
+  let roles = customRolesList;
+  if (!roles) {
+    try {
+      roles = JSON.parse(localStorage.getItem('pos_custom_roles'));
+    } catch (e) {}
+  }
+  if (!roles) {
+    roles = DEFAULT_CUSTOM_ROLES;
+  }
+  const dynamicRole = roles?.find(r => r.id === user.role || r.name === user.role);
+  if (dynamicRole) {
+    return dynamicRole.allowedTabs.includes(tab);
   }
   const perms = ROLE_PERMISSIONS[user.role] || [];
   return perms.includes(tab);
@@ -925,6 +980,10 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
     return { gross, cashSales, cardSales, count: filteredOrders.length, expenses: filteredExp, receivables };
   }, [orders, expenses, customerPayments, customers, isDateInRange]);
 
+  const totalCollected = (stats.cashSales || 0) + (stats.cardSales || 0) || 1;
+  const cashPct = Math.round(((stats.cashSales || 0) / totalCollected) * 100);
+  const cardPct = 100 - cashPct;
+
   const recentActivity = useMemo(() => {
     return orders
       .filter(o => isDateInRange(o.timestamp || new Date()))
@@ -973,6 +1032,8 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
     { name: isRtl ? 'فرع زايد' : 'Zayed Branch', netCash: currentBranchCash > 0 ? currentBranchCash * 0.6 : 3200 }
   ];
 
+  const totalSafeCash = safeBoxes.reduce((sum, box) => sum + Math.max(0, box.netCash), 0) || 1;
+
   // Multi-Branch Low Stock Alerts
   const lowStockAlerts = useMemo(() => {
     const localLow = items.filter(i => (i.type || 'PRODUCT') === 'PRODUCT' && (i.stock || 0) > 0 && (i.stock || 0) < 5).map(i => ({ ...i, branchName: activeBranchNameLocal }));
@@ -1011,24 +1072,24 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
 
       {/* ── DAILY PULSE (Hero Section) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="relative overflow-hidden bg-[var(--bg-sidebar)] p-6 border border-white/5 shadow-2xl luxury-card">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/30 dark:from-[#151518] dark:to-[#151518] p-6 border border-white/5 shadow-2xl luxury-card">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#0066FF] blur-[80px] opacity-20 -mr-16 -mt-16"></div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[2px] mb-4">{isRtl ? 'إجمالي المبيعات' : 'Gross Revenue'}</p>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-4xl font-black text-white tracking-tighter">{formatMoney(stats.gross)}</h2>
+            <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{formatMoney(stats.gross)}</h2>
             <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
               {dateFilter === 'today' ? '↑ Today' : dateFilter === 'yesterday' ? 'Yesterday' : '7 Days'}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-2">
-            <div className="flex-1 h-1 bg-white/5 overflow-hidden">
+            <div className="flex-1 h-1 bg-slate-100 dark:bg-white/5 overflow-hidden">
               <div className="h-full bg-[#0066FF] transition-all duration-1000" style={{ width: '70%' }}></div>
             </div>
             <span className="text-[9px] font-black text-slate-400">{stats.count} OPS</span>
           </div>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative luxury-card">
+        <div className="bg-gradient-to-br from-white to-emerald-50/30 dark:from-[#151518] dark:to-[#151518] p-6 border border-[var(--border-color)] relative luxury-card">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[2px] mb-4">{isRtl ? 'التحصيل النقدي' : 'Cash Liquidity'}</p>
@@ -1036,10 +1097,21 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
             </div>
             <div className="w-10 h-10 bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl font-bold">💵</div>
           </div>
-          <p className="text-[9px] text-[var(--text-muted)] mt-5 font-bold uppercase tracking-widest">{isRtl ? 'صافي الكاش المتوفر' : 'Net Cash in Hand'}</p>
+          {/* Multi-segmented progress bar */}
+          <div className="mt-5 space-y-2">
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800">
+              <div className="bg-emerald-500 transition-all duration-500" style={{ width: `${cashPct}%` }} title={`Cash: ${cashPct}%`} />
+              <div className="bg-blue-500 transition-all duration-500" style={{ width: `${cardPct}%` }} title={`Card: ${cardPct}%`} />
+            </div>
+            <div className="flex justify-between text-[9px] text-[var(--text-muted)] font-black uppercase tracking-wider">
+              <span>{isRtl ? 'نقدي' : 'Cash'}: {cashPct}%</span>
+              <span>{isRtl ? 'شبكة' : 'Card'}: {cardPct}%</span>
+            </div>
+          </div>
+          <p className="text-[8px] text-[var(--text-muted)] mt-2 font-bold uppercase tracking-widest">{isRtl ? 'صافي الكاش المتوفر' : 'Net Cash in Hand'}</p>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative luxury-card">
+        <div className="bg-gradient-to-br from-white to-blue-50/30 dark:from-[#151518] dark:to-[#151518] p-6 border border-[var(--border-color)] relative luxury-card">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[2px] mb-4">{isRtl ? 'مبيعات الكروت' : 'Digital Volume'}</p>
@@ -1047,10 +1119,21 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
             </div>
             <div className="w-10 h-10 bg-blue-500/10 flex items-center justify-center text-blue-500 text-xl font-bold">💳</div>
           </div>
-          <p className="text-[9px] text-[var(--text-muted)] mt-5 font-bold uppercase tracking-widest">{isRtl ? 'تحصيل الشبكة' : 'Card & Bank Entries'}</p>
+          {/* Multi-segmented progress bar */}
+          <div className="mt-5 space-y-2">
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800">
+              <div className="bg-emerald-500 transition-all duration-500" style={{ width: `${cashPct}%` }} title={`Cash: ${cashPct}%`} />
+              <div className="bg-blue-500 transition-all duration-500" style={{ width: `${cardPct}%` }} title={`Card: ${cardPct}%`} />
+            </div>
+            <div className="flex justify-between text-[9px] text-[var(--text-muted)] font-black uppercase tracking-wider">
+              <span>{isRtl ? 'نقدي' : 'Cash'}: {cashPct}%</span>
+              <span>{isRtl ? 'شبكة' : 'Card'}: {cardPct}%</span>
+            </div>
+          </div>
+          <p className="text-[8px] text-[var(--text-muted)] mt-2 font-bold uppercase tracking-widest">{isRtl ? 'تحصيل الشبكة' : 'Card & Bank Entries'}</p>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] border-b-4 border-rose-500/40 luxury-card">
+        <div className="bg-gradient-to-br from-white to-rose-50/30 dark:from-[#151518] dark:to-[#151518] p-6 border border-[var(--border-color)] border-b-4 border-rose-500/40 luxury-card">
           <p className="text-[10px] font-black text-rose-500/60 uppercase tracking-[2px] mb-4">{isRtl ? 'إجمالي المصاريف' : 'Expense Burn'}</p>
           <h2 className="text-3xl font-black text-rose-500 tracking-tighter">{formatMoney(stats.expenses)}</h2>
           <div className="mt-5 flex justify-between items-center">
@@ -1131,8 +1214,20 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
                    return (
                      <div key={b.name} className="group">
                        <div className="flex justify-between text-[10px] font-bold uppercase mb-1.5">
-                         <span className="text-[var(--text-primary)] tracking-widest group-hover:text-[#D4AF37] transition-colors">{b.name}</span>
-                         <span className="text-white">{formatMoney(b.sales)} <span className="text-[var(--text-muted)]">({pct}%)</span></span>
+                         <span className="inline-flex items-center gap-2">
+                           <span className="relative flex h-2 w-2">
+                             {(b.name === activeBranchNameLocal || b.sales > 0) ? (
+                               <>
+                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                               </>
+                             ) : (
+                               <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400 opacity-50"></span>
+                             )}
+                           </span>
+                           <span className="text-[var(--text-primary)] tracking-widest group-hover:text-[#D4AF37] transition-colors">{b.name}</span>
+                         </span>
+                         <span className="text-[var(--text-primary)] dark:text-white">{formatMoney(b.sales)} <span className="text-[var(--text-muted)]">({pct}%)</span></span>
                        </div>
                        <div className="h-1 bg-[var(--bg-deep)] overflow-hidden border border-[#222]">
                          <div className="h-full bg-gradient-to-r from-[#0066FF] to-[#D4AF37] transition-all duration-1000" style={{ width: `${pct}%` }}></div>
@@ -1220,12 +1315,21 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
               <span className="text-[10px] font-black text-[#0066FF] animate-pulse">● LIVE</span>
             </div>
             <div className="p-0 divide-y divide-[#222]">
-              {safeBoxes.map((box, idx) => (
-                <div key={idx} className="p-4 flex justify-between items-center hover:bg-[#1a1a1a] transition-colors">
-                  <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-widest">{box.name}</span>
-                  <span className="text-sm font-black text-emerald-400">{formatMoney(box.netCash)}</span>
-                </div>
-              ))}
+              {safeBoxes.map((box, idx) => {
+                const cashWeightPct = Math.min(100, Math.round((Math.max(0, box.netCash) / totalSafeCash) * 100)) || 0;
+                return (
+                  <div key={idx} className="p-4 hover:bg-[#1a1a1a] transition-colors space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-widest">{box.name}</span>
+                      <span className="text-sm font-black text-emerald-400">{formatMoney(box.netCash)}</span>
+                    </div>
+                    {/* Ultra-thin Treasury Pulse Bar */}
+                    <div className="w-full bg-[#222] h-1 rounded-full overflow-hidden">
+                      <div className="bg-emerald-400 h-full transition-all duration-1000" style={{ width: `${cashWeightPct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1313,7 +1417,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
 // ============================================================
 // SHIFTS SCREEN
 // ============================================================
-function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUser, language, users, orders, expenses, onLogout, storeName, currency, drawerLogs }) {
+function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUser, language, users, orders, expenses, onLogout, storeName, currency, drawerLogs, customRoles }) {
   const [openingBal, setOpeningBal] = useState('');
   const [actualCash, setActualCash] = useState('');
   const [selectedShiftId, setSelectedShiftId] = useState(null);
@@ -1402,7 +1506,7 @@ function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUs
 
           {activeShift ? (
             <div className="space-y-4">
-              {currentUser.role !== 'Cashier' && shiftAnalysis && (
+              {isManagerOrAbove(currentUser, customRoles) && shiftAnalysis && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-[var(--bg-card)]/10 p-4 rounded-none">
                     <p className="text-[9px] font-black uppercase opacity-70">{isRtl ? 'صافي الوردية (النشاط)' : 'Shift Activity Net'}</p>
@@ -1466,7 +1570,7 @@ function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUs
                   </div>
                 </div>
 
-                {currentUser.role !== 'Cashier' && (
+                {isManagerOrAbove(currentUser, customRoles) && (
                   <div className="grid grid-cols-4 gap-2">
                     <div className="bg-[var(--bg-deep)]/40 p-2">
                       <p className="text-[8px] text-[var(--text-muted)] font-black uppercase">{isRtl ? 'مبيعات نقدية' : 'Cash Sales'}</p>
@@ -1492,7 +1596,7 @@ function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUs
                   <p>{isRtl ? 'بدأ بـ:' : 'Started:'} {formatMoney(shift.openingBalance)}</p>
                   <p>{isRtl ? 'انتهى في:' : 'Ended:'} {new Date(shift.closedAt).toLocaleString() || '—'}</p>
                 </div>
-                {currentUser.role !== 'Cashier' && shift.cashVariance !== undefined && (
+                {isManagerOrAbove(currentUser, customRoles) && shift.cashVariance !== undefined && (
                   <div className={`p-2 text-center text-[10px] font-black uppercase tracking-widest ${Math.abs(shift.cashVariance) < 0.1 ? 'bg-emerald-500/10 text-[#0066FF]' : 'bg-rose-500/10 text-rose-500'}`}>
                     {isRtl ? 'الفرق في العجز/الزيادة:' : 'Cash Variance:'} {formatMoney(shift.cashVariance)}
                   </div>
@@ -2521,7 +2625,7 @@ function DrawerScreen({ activeShift, drawerBalance, setDrawerBalance, setMainSaf
 // ============================================================
 // SETTINGS SCREEN
 // ============================================================
-function SettingsScreen({ currentUser, users, language, setLanguage, theme, setTheme, onUpdateUser, userPermissions, setUserPermissions, storeName, setStoreName, currency, setCurrency, taxRate, setTaxRate, enableServiceFee, setEnableServiceFee, serviceFee, setServiceFee, pushNotification, invoiceLogo, setInvoiceLogo, invoiceHeader, setInvoiceHeader, invoiceFooter, setInvoiceFooter }) {
+function SettingsScreen({ currentUser, users, language, setLanguage, theme, setTheme, onUpdateUser, userPermissions, setUserPermissions, storeName, setStoreName, currency, setCurrency, taxRate, setTaxRate, enableServiceFee, setEnableServiceFee, serviceFee, setServiceFee, pushNotification, invoiceLogo, setInvoiceLogo, invoiceHeader, setInvoiceHeader, invoiceFooter, setInvoiceFooter, customRoles, setCustomRoles }) {
   const isRtl = language === 'ar';
   const isOwner = currentUser.role === 'Owner' || currentUser.role === 'admin';
   const [section, setSection] = useState('profile');
@@ -2615,6 +2719,9 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
   const [passSaved, setPassSaved] = useState(false);
 
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedRoleId, setSelectedRoleId] = useState(null);
+  const [roleName, setRoleName] = useState('');
+  const [roleTabs, setRoleTabs] = useState([]);
 
   const [localStoreName, setLocalStoreName] = useState(storeName);
   const [localCurrency, setLocalCurrency] = useState(currency);
@@ -2735,7 +2842,10 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {[
           ['profile', isRtl ? '👤 الملف الشخصي' : '👤 My Profile'],
-          ...(isOwner ? [['permissions', isRtl ? '🔐 إدارة الصلاحيات' : '🔐 Permissions']] : []),
+          ...(isOwner ? [
+            ['permissions', isRtl ? '🔐 إدارة الصلاحيات' : '🔐 Permissions'],
+            ['custom_roles', isRtl ? '🛡️ الأدوار المخصصة' : '🛡️ Custom Roles']
+          ] : []),
           ['appearance', isRtl ? '🌓 المظهر' : '🌓 Appearance'],
           ['language', isRtl ? '🌐 اللغة' : '🌐 Language'],
           ['system', isRtl ? 'ℹ️ النظام' : 'ℹ️ System'],
@@ -2857,7 +2967,7 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
                     <div style={{ overflow: 'hidden', flex: 1 }}>
                       <p style={{ fontWeight: 700, fontSize: 12, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                        <span style={{ fontSize: 9, fontWeight: 800, color: '#0d9488', background: '#ccfbf1', padding: '1px 7px', borderRadius: 20 }}>{u.role}</span>
+                        <span style={{ fontSize: 9, fontWeight: 800, color: '#0d9488', background: '#ccfbf1', padding: '1px 7px', borderRadius: 20 }}>{getRoleName(u.role)}</span>
                         {hasCustom && <span style={{ fontSize: 9, fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: 20 }}>CUSTOM</span>}
                       </div>
                     </div>
@@ -2929,6 +3039,123 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
             <div style={{ flex: 1, ...S.card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, minHeight: 280 }}>
               <span style={{ fontSize: 48 }}>🔐</span>
               <p style={{ fontWeight: 800, color: '#cbd5e1', fontSize: 14, marginTop: 12, textTransform: 'uppercase' }}>{isRtl ? 'اختر مستخدماً من القائمة' : 'Select a user to manage permissions'}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── CUSTOM ROLES SECTION (Owner only) ── */}
+      {section === 'custom_roles' && isOwner && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {/* Roles List */}
+          <div style={{ ...S.card, width: 280, flexShrink: 0 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontWeight: 900, fontSize: 14, color: 'var(--text-primary)' }}>{isRtl ? 'الأدوار المخصصة' : 'Custom Roles'}</p>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{isRtl ? 'إدارة أدوار صلاحيات الموظفين' : 'Manage employee permission roles'}</p>
+              </div>
+            </div>
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {customRoles.map(role => {
+                const isSelected = selectedRoleId === role.id;
+                return (
+                  <div key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                    <button onClick={() => { setSelectedRoleId(role.id); setRoleName(role.name); setRoleTabs(role.allowedTabs); }}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, border: isSelected ? '2px solid var(--accent-blue)' : '2px solid transparent', background: isSelected ? 'var(--accent-blue-light)' : 'transparent', cursor: 'pointer', textAlign: isRtl ? 'right' : 'left' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 12, background: isSelected ? 'var(--accent-blue)' : 'var(--bg-deep)', color: isSelected ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justify: 'center', fontWeight: 900, fontSize: 14, flexShrink: 0 }}>👥</div>
+                      <div style={{ overflow: 'hidden', flex: 1 }}>
+                        <p style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{role.name}</p>
+                        <p style={{ fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', marginTop: 2 }}>{role.allowedTabs.length} {isRtl ? 'شاشات' : 'screens'}</p>
+                      </div>
+                    </button>
+                    <button onClick={() => {
+                      if (window.confirm(isRtl ? `حذف دور "${role.name}"؟` : `Delete role "${role.name}"?`)) {
+                        setCustomRoles(prev => prev.filter(r => r.id !== role.id));
+                        if (selectedRoleId === role.id) {
+                          setSelectedRoleId(null);
+                          setRoleName('');
+                          setRoleTabs([]);
+                        }
+                      }
+                    }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 8, fontSize: 14 }}>🗑️</button>
+                  </div>
+                );
+              })}
+              
+              <button onClick={() => { setSelectedRoleId('NEW'); setRoleName(''); setRoleTabs([]); }}
+                style={{ width: '100%', padding: '12px', borderRadius: 14, border: '2px dashed var(--border-color)', background: 'transparent', color: 'var(--accent-blue)', fontWeight: 800, fontSize: 12, cursor: 'pointer', marginTop: 10 }}>
+                ➕ {isRtl ? 'إضافة دور جديد' : 'Add New Role'}
+              </button>
+            </div>
+          </div>
+
+          {/* Role Edit/Add Form */}
+          {selectedRoleId ? (
+            <div style={{ flex: 1, minWidth: 320, ...S.card }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)' }}>
+                <p style={{ fontWeight: 900, fontSize: 15, color: 'var(--text-primary)' }}>{selectedRoleId === 'NEW' ? (isRtl ? 'إضافة دور جديد' : 'Create New Role') : (isRtl ? 'تعديل الدور' : 'Edit Role')}</p>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{isRtl ? 'حدد اسم الدور والصلاحيات المسموحة له' : 'Configure role name and accessible screens'}</p>
+              </div>
+              
+              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={S.label}>{isRtl ? 'اسم الدور الوظيفي' : 'Role Name'}</label>
+                  <input style={S.input} value={roleName} onChange={e => setRoleName(e.target.value)} placeholder={isRtl ? 'أدخل اسم الدور...' : 'e.g. Accountant...'} />
+                </div>
+                
+                <div>
+                  <label style={S.label}>{isRtl ? 'الصلاحيات والشاشات المسموحة' : 'Allowed Screens & Tabs'}</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, marginTop: 8 }}>
+                    {visibleTabs.map(tab => {
+                      const allowed = roleTabs.includes(tab.id);
+                      const toggleTab = () => {
+                        setRoleTabs(prev => allowed ? prev.filter(t => t !== tab.id) : [...prev, tab.id]);
+                      };
+                      return (
+                        <button key={tab.id} onClick={toggleTab}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
+                            border: allowed ? '2px solid var(--accent-blue)' : '2px solid var(--border-color)',
+                            background: allowed ? 'var(--accent-blue-light)' : 'var(--bg-deep)',
+                            cursor: 'pointer', transition: 'all 0.15s',
+                          }}>
+                          <span style={{ fontSize: 20 }}>{tab.icon}</span>
+                          <div style={{ textAlign: isRtl ? 'right' : 'left' }}>
+                            <p style={{ fontWeight: 700, fontSize: 12, color: allowed ? 'var(--accent-blue)' : 'var(--text-secondary)', lineHeight: 1.2 }}>{tab.label}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button onClick={() => {
+                  if (!roleName.trim()) {
+                    alert(isRtl ? 'يرجى إدخال اسم الدور' : 'Please enter role name');
+                    return;
+                  }
+                  if (selectedRoleId === 'NEW') {
+                    const newRole = {
+                      id: 'role_' + Date.now().toString(36),
+                      name: roleName.trim(),
+                      allowedTabs: roleTabs
+                    };
+                    setCustomRoles(prev => [...prev, newRole]);
+                    setSelectedRoleId(newRole.id);
+                  } else {
+                    setCustomRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, name: roleName.trim(), allowedTabs: roleTabs } : r));
+                  }
+                  alert(isRtl ? 'تم حفظ الدور بنجاح' : 'Role saved successfully');
+                }}
+                  style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, var(--accent-blue), #1e3a8a)', color: '#fff', fontWeight: 800, fontSize: 13, marginTop: 10 }}>
+                  💾 {isRtl ? 'حفظ الصلاحيات والدور' : 'Save Role & Permissions'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, ...S.card, padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 40 }}>🛡️</span>
+              <p style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>{isRtl ? 'حدد دوراً لتعديله أو أضف دوراً جديداً' : 'Select a role to edit or create a new one'}</p>
             </div>
           )}
         </div>
@@ -3934,7 +4161,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 // ============================================================
 // SIDEBAR
 // ============================================================
-function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName, theme }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguage, userPermissions, collapsed, setCollapsed, activeBranchName, theme, customRoles }) {
   const currentUser = user;
   const isDark = theme === 'dark';
 
@@ -4027,16 +4254,19 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
 
   return (
     <aside
+      className={isDark ? "" : "backdrop-blur-md"}
       style={{
         width: collapsed ? 72 : 256,
-        background: SB.bg,
+        background: isDark ? SB.bg : 'rgba(255, 255, 255, 0.7)',
+        WebkitBackdropFilter: isDark ? 'none' : 'blur(12px)',
+        backdropFilter: isDark ? 'none' : 'blur(12px)',
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         transition: 'width 0.25s ease, background 0.2s ease',
-        borderRight: isRtl ? 'none' : `1px solid ${SB.border}`,
-        borderLeft: isRtl ? `1px solid ${SB.border}` : 'none',
+        borderRight: isRtl ? 'none' : (isDark ? `1px solid ${SB.border}` : '1px solid rgba(226, 232, 240, 0.6)'),
+        borderLeft: isRtl ? (isDark ? `1px solid ${SB.border}` : '1px solid rgba(226, 232, 240, 0.6)') : 'none',
         overflow: 'hidden',
       }}
     >
@@ -4088,7 +4318,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
             </div>
             <div style={{ overflow: 'hidden', flex: 1 }}>
               <p style={{ color: SB.nameText, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{user?.name || 'User'}</p>
-              <p style={{ color: SB.roleBadge, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>{user?.role}</p>
+              <p style={{ color: SB.roleBadge, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>{getRoleName(user?.role)}</p>
             </div>
           </div>
           {activeBranchName && (
@@ -4102,19 +4332,27 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
 
       {/* Nav Groups */}
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 8px' }}>
-        {groups.map(group => (
-          <div key={group.label} style={{ marginBottom: 16 }}>
-            {!collapsed && (
-              <p style={{ color: SB.groupLabel, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', padding: '0 8px', marginBottom: 6, marginTop: 4 }}>{group.label}</p>
-            )}
-            {group.items.map(tab => {
-              const hasPerm = canAccess(user, tab.id, userPermissions);
-              const isActive = activeTab === tab.id;
-              const isAdmin = tab.id === 'admin_panel';
-              return (
-                <button key={tab.id}
-                  onClick={() => hasPerm && setActiveTab(tab.id)}
-                  disabled={!hasPerm}
+        {groups.map(group => {
+          const activeCustomRole = customRoles?.find(r => r.id === user?.role || r.name === user?.role);
+          const visibleItems = group.items.filter(tab => {
+            return (user?.role === 'Owner' || user?.role === 'admin' || user?.role === 'owner') ||
+                   (activeCustomRole && activeCustomRole.allowedTabs.includes(tab.id));
+          });
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={group.label} style={{ marginBottom: 16 }}>
+              {!collapsed && (
+                <p style={{ color: SB.groupLabel, fontWeight: 800, fontSize: 9, textTransform: 'uppercase', letterSpacing: '1.5px', padding: '0 8px', marginBottom: 6, marginTop: 4 }}>{group.label}</p>
+              )}
+              {visibleItems.map(tab => {
+                const hasPerm = true;
+                const isActive = activeTab === tab.id;
+                const isAdmin = tab.id === 'admin_panel';
+                return (
+                  <button key={tab.id}
+                    onClick={() => hasPerm && setActiveTab(tab.id)}
+                    disabled={!hasPerm}
                   title={collapsed ? tab.label : ''}
                   style={{
                     width: '100%',
@@ -4155,7 +4393,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
               );
             })}
           </div>
-        ))}
+        )})}
       </nav>
 
       {/* Sidebar Footer */}
@@ -4243,7 +4481,7 @@ function SubscriptionWarningBanner({ daysLeft, onRenew, language }) {
 // ============================================================
 // STAFF SCREEN - Full Implementation
 // ============================================================
-function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift }) {
+function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift, customRoles }) {
   const isRtl = language === 'ar';
   const [view, setView] = useState('employees'); // 'employees' | 'users'
   const [search, setSearch] = useState('');
@@ -4255,7 +4493,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
 
   // Form fields
   const [fName, setFName] = useState('');
-  const [fRole, setFRole] = useState('Cashier');
+  const [fRole, setFRole] = useState(() => customRoles && customRoles.length > 0 ? customRoles[0].id : 'role_cashier');
   const [fSalary, setFSalary] = useState('');
   const [fFrequency, setFFrequency] = useState('MONTHLY');
   const [fUsername, setFUsername] = useState('');
@@ -4309,11 +4547,11 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     });
   };
 
-  const ROLES = ['Cashier', 'Admin', 'Manager', 'Accountant', 'Storekeeper'];
+  const ROLES = customRoles || [];
 
   const filtered = employees.filter(e => {
     const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === 'ALL' || e.role === roleFilter;
+    const matchRole = roleFilter === 'ALL' || e.role === roleFilter || e.roleId === roleFilter;
     return matchSearch && matchRole && !e.deletedAt;
   });
 
@@ -4327,15 +4565,19 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
 
   const openAdd = () => {
     setEditingEmp(null);
-    setFName(''); setFRole('Cashier'); setFSalary(''); setFFrequency('MONTHLY'); setFUsername(''); setFPassword(''); setFBranchId('');
+    setFName(''); setFRole(ROLES[0]?.id || 'role_cashier'); setFSalary(''); setFFrequency('MONTHLY'); setFUsername(''); setFPassword('');
+    const userBranch = currentUser?.assignedBranchId || currentUser?.branchId || '';
+    setFBranchId(currentUser?.role === 'Owner' || currentUser?.role === 'admin' || currentUser?.role === 'owner' ? '' : userBranch);
     loadBranches();
     setShowForm(true);
   };
 
   const openEdit = (emp) => {
     setEditingEmp(emp);
-    setFName(emp.name); setFRole(emp.role); setFSalary(emp.salaryBase.toString()); setFFrequency(emp.paymentFrequency || 'MONTHLY');
-    setFUsername(emp.username || ''); setFPassword(''); setFBranchId(emp.assignedBranchId || '');
+    setFName(emp.name); setFRole(emp.roleId || emp.role); setFSalary(emp.salaryBase.toString()); setFFrequency(emp.paymentFrequency || 'MONTHLY');
+    setFUsername(emp.username || ''); setFPassword('');
+    const userBranch = currentUser?.assignedBranchId || currentUser?.branchId || '';
+    setFBranchId(currentUser?.role === 'Owner' || currentUser?.role === 'admin' || currentUser?.role === 'owner' ? (emp.assignedBranchId || emp.branchId || '') : userBranch);
     loadBranches();
     setShowForm(true);
   };
@@ -4354,19 +4596,19 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     const branchNameVal = branchList.find(b => b.id === branchIdVal)?.name || null;
 
     if (editingEmp) {
-      const updated = { ...editingEmp, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { pin: fPassword } : {}) };
+      const updated = { ...editingEmp, name: fName.trim(), role: fRole, roleId: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { pin: fPassword } : {}) };
       setEmployees(prev => prev.map(e => e.id === editingEmp.id ? updated : e));
       // sync user
       if (editingEmp.userId) {
         const u = users.find(x => x.id === editingEmp.userId);
-        if (u) setUsers(prev => prev.map(x => x.id === u.id ? { ...x, name: fName.trim(), username: fUsername, role: fRole, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { password: fPassword, pin: fPassword } : {}) } : x));
+        if (u) setUsers(prev => prev.map(x => x.id === u.id ? { ...x, name: fName.trim(), username: fUsername, role: fRole, roleId: fRole, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { password: fPassword, pin: fPassword } : {}) } : x));
       }
       pushNotification(isRtl ? 'تم تحديث الموظف' : 'Employee updated', 'success');
     } else {
       const empId = 'EMP-' + Date.now().toString(36).toUpperCase();
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
-      const newUser = { id: userId, name: fName.trim(), username: fUsername, password: fPassword, pin: fPassword, role: fRole, isActive: true, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal };
-      const newEmp = { id: empId, userId, name: fName.trim(), role: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, pin: fPassword, assignedBranchId: branchIdVal, assignedBranchName: branchNameVal, status: 'ACTIVE', shiftStatus: 'OFF_SHIFT', todaySales: 0, performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } };
+      const newUser = { id: userId, name: fName.trim(), username: fUsername, password: fPassword, pin: fPassword, role: fRole, roleId: fRole, isActive: true, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal };
+      const newEmp = { id: empId, userId, name: fName.trim(), role: fRole, roleId: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, pin: fPassword, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal, status: 'ACTIVE', shiftStatus: 'OFF_SHIFT', todaySales: 0, performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } };
       setUsers(prev => [...prev, newUser]);
       setEmployees(prev => [...prev, newEmp]);
       pushNotification(isRtl ? 'تم إضافة الموظف' : 'Employee added', 'success');
@@ -4462,7 +4704,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
             <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
               className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none px-4 py-3 text-sm font-bold outline-none">
               <option value="ALL">{isRtl ? 'كل الأدوار' : 'All Roles'}</option>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              {ROLES.map(r => <option key={r.id || r} value={r.id || r}>{r.name || r}</option>)}
             </select>
             <button onClick={openAdd} className="bg-[#0066FF] text-[var(--text-primary)] px-6 py-3 rounded-none font-black text-xs uppercase">
               + {isRtl ? 'موظف جديد' : 'New Employee'}
@@ -4491,7 +4733,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                         </div>
                         <div>
                           <p className={`font-black text-base ${emp.status === 'SUSPENDED' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>{emp.name}</p>
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-none ${roleColors[emp.role] || 'bg-[var(--bg-deep)] text-[var(--text-muted)]'}`}>{emp.role}</span>
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-none ${roleColors[emp.role] || roleColors[getRoleName(emp.role)] || 'bg-[var(--bg-deep)] text-[var(--text-muted)]'}`}>{getRoleName(emp.role)}</span>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
@@ -4645,7 +4887,8 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                 <label className="text-[10px] font-black text-[var(--text-muted)] uppercase block mb-1.5">{isRtl ? 'الدور الوظيفي' : 'Role'}</label>
                 <select value={fRole} onChange={e => setFRole(e.target.value)}
                   className="w-full bg-[var(--bg-deep)] border border-[var(--border-color)] rounded-none px-4 py-3 text-sm font-bold outline-none">
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  <option value="Owner">{isRtl ? 'المالك / Owner' : 'Owner'}</option>
+                  {ROLES.map(r => <option key={r.id || r} value={r.id || r}>{r.name || r}</option>)}
                 </select>
               </div>
 
@@ -4659,6 +4902,11 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                   <div className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-xs font-bold text-[#D4AF37] flex items-center gap-2">
                     <span>👑</span>
                     {isRtl ? 'المالك — صلاحية على جميع الفروع' : 'Owner — Global Access to All Branches'}
+                  </div>
+                ) : (currentUser.role !== 'Owner' && currentUser.role !== 'admin' && currentUser.role !== 'owner') ? (
+                  <div className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-xs font-bold text-[#D4AF37] flex items-center gap-2">
+                    <span>🏢</span>
+                    {currentUser.assignedBranchName || activeBranchName}
                   </div>
                 ) : branchesLoading ? (
                   <div className="w-full bg-[#0a0a0a] border border-[#333] px-4 py-3 text-xs font-bold text-[#666] flex items-center gap-2">
@@ -6896,6 +7144,19 @@ export default function App() {
     return cached ? JSON.parse(cached) : null;
   });
   const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('pos_users')) || DEFAULT_USERS);
+  const [customRoles, setCustomRoles] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pos_custom_roles');
+      return cached ? JSON.parse(cached) : DEFAULT_CUSTOM_ROLES;
+    } catch (e) {
+      return DEFAULT_CUSTOM_ROLES;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pos_custom_roles', JSON.stringify(customRoles));
+  }, [customRoles]);
+
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [showAuth, setShowAuth] = useState(() => {
     if (inviteContext !== null) return true;
@@ -7255,6 +7516,22 @@ export default function App() {
     window.addEventListener('keydown', handleGlobalBailout, true);
     return () => window.removeEventListener('keydown', handleGlobalBailout, true);
   }, []);
+
+  // Strict Branch Lock Guard for Non-Owner/Non-Admin Users
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'Owner' && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+      const userBranchId = currentUser.assignedBranchId || currentUser.branchId;
+      if (userBranchId && branchId !== userBranchId) {
+        setBranchId(userBranchId);
+        setActiveBranchName(currentUser.assignedBranchName || '');
+        localStorage.setItem('active_branch_id', userBranchId);
+        if (currentUser.assignedBranchName) {
+          localStorage.setItem('active_branch_name', currentUser.assignedBranchName);
+        }
+        reloadBranchData(userBranchId);
+      }
+    }
+  }, [currentUser, branchId, reloadBranchData]);
 
   // Global Persistence Effect (localStorage cache + Supabase cloud sync)
   useEffect(() => {
@@ -7999,10 +8276,10 @@ export default function App() {
       case 'inventory': return <InventoryScreen items={calculatedItems} categories={categories} modifiers={MODIFIERS} onAddCategory={c => setCategories(p => [...p, c])} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} language={language} />;
       case 'customers': return <CustomersScreen customers={customers} orders={orders} customerPayments={customerPayments} onAddCustomer={handleAddCustomer} onAddCustomerPayment={handleAddCustomerPayment} language={language} />;
       case 'expenses': return <ExpensesScreen expenses={expenses} onAddExpense={handleAddExpense} currentUser={currentUser} activeShift={activeShift} language={language} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
-      case 'settings': return <SettingsScreen currentUser={currentUser} users={users} language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} onUpdateUser={handleUpdateUser} userPermissions={userPermissions} setUserPermissions={setUserPermissions} storeName={storeName} setStoreName={setStoreName} currency={currency} setCurrency={setCurrency} taxRate={taxRate} setTaxRate={setTaxRate} enableServiceFee={enableServiceFee} setEnableServiceFee={setEnableServiceFee} serviceFee={serviceFee} setServiceFee={setServiceFee} pushNotification={pushNotification} invoiceLogo={invoiceLogo} setInvoiceLogo={setInvoiceLogo} invoiceHeader={invoiceHeader} setInvoiceHeader={setInvoiceHeader} invoiceFooter={invoiceFooter} setInvoiceFooter={setInvoiceFooter} />;
+      case 'settings': return <SettingsScreen currentUser={currentUser} users={users} language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} onUpdateUser={handleUpdateUser} userPermissions={userPermissions} setUserPermissions={setUserPermissions} storeName={storeName} setStoreName={setStoreName} currency={currency} setCurrency={setCurrency} taxRate={taxRate} setTaxRate={setTaxRate} enableServiceFee={enableServiceFee} setEnableServiceFee={setEnableServiceFee} serviceFee={serviceFee} setServiceFee={setServiceFee} pushNotification={pushNotification} invoiceLogo={invoiceLogo} setInvoiceLogo={setInvoiceLogo} invoiceHeader={invoiceHeader} setInvoiceHeader={setInvoiceHeader} invoiceFooter={invoiceFooter} setInvoiceFooter={setInvoiceFooter} customRoles={customRoles} setCustomRoles={setCustomRoles} />;
       case 'purchases': return <PurchasesScreen purchases={purchases} setPurchases={setPurchases} items={items} setItems={setItems} vouchers={vouchers} setVouchers={setVouchers} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'treasury': return <TreasuryScreen orders={orders} purchases={purchases} expenses={expenses} vouchers={vouchers} customerPayments={customerPayments} staffPayments={staffPayments} cashLog={cashLog} setCashLog={setCashLog} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} bankBalance={bankBalance} setBankBalance={setBankBalance} />;
-      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
+      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} customRoles={customRoles} />;
       case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} vouchers={vouchers} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
       case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
@@ -8089,6 +8366,7 @@ export default function App() {
         setCollapsed={setCollapsed}
         activeBranchName={activeBranchName}
         theme={theme}
+        customRoles={customRoles}
       />
 
       <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
