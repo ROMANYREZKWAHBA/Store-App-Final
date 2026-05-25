@@ -12,6 +12,88 @@ import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
 import LandingPage from './LandingPage';
 
+function getCategories() {
+  return [
+    { id: 'cat_1', name: { en: 'Coffee', ar: 'قهوة' }, icon: '☕' },
+    { id: 'cat_2', name: { en: 'Tea', ar: 'شاي' }, icon: '🫖' },
+    { id: 'cat_3', name: { en: 'Pastries', ar: 'مخبوزات' }, icon: '🥐' },
+    { id: 'cat_4', name: { en: 'Cold Drinks', ar: 'مشروبات باردة' }, icon: '🥤' },
+    { id: 'cat_5', name: { en: 'Desserts', ar: 'حلويات' }, icon: '🍰' },
+    { id: 'cat_6', name: { en: 'Raw Materials', ar: 'مواد خام' }, icon: '🥛' },
+  ];
+}
+
+function getModifiers() {
+  return [
+    { id: 'm_1', name: { en: 'Regular Milk', ar: 'حليب عادي' }, priceDelta: 0, group: 'Milk' },
+    { id: 'm_2', name: { en: 'Lactose-Free', ar: 'خالي لاكتوز' }, priceDelta: 0.5, group: 'Milk' },
+    { id: 'm_3', name: { en: 'Almond Milk', ar: 'حليب لوز' }, priceDelta: 0.75, group: 'Milk' },
+    { id: 'm_4', name: { en: 'Oat Milk', ar: 'حليب شوفان' }, priceDelta: 0.75, group: 'Milk' },
+    { id: 'm_5', name: { en: 'No Sugar', ar: 'بدون سكر' }, priceDelta: 0, group: 'Sugar' },
+    { id: 'm_6', name: { en: '1 Sugar', ar: '١ سكر' }, priceDelta: 0, group: 'Sugar' },
+    { id: 'm_7', name: { en: '2 Sugar', ar: '٢ سكر' }, priceDelta: 0, group: 'Sugar' },
+    { id: 'm_8', name: { en: '3 Sugar', ar: '٣ سكر' }, priceDelta: 0, group: 'Sugar' },
+    { id: 'm_12', name: { en: 'Vanilla Syrup', ar: 'سيروب فانيلا' }, priceDelta: 0.5, group: 'Flavor' },
+    { id: 'm_13', name: { en: 'Caramel Syrup', ar: 'سيروب كاراميل' }, priceDelta: 0.5, group: 'Flavor' },
+  ];
+}
+
+function getInitialItems() {
+  return [
+    { id: 'i_1', sku: '1001', categoryId: 'cat_1', name: { en: 'Espresso', ar: 'اسبريسو' }, basePrice: 2.5, costPrice: 0.8, image: 'https://placehold.co/300', sizes: [{ id: 's1', name: 'S', priceDelta: 0 }, { id: 's2', name: 'M', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 50, isActive: true, type: 'PRODUCT' },
+    { id: 'i_2', sku: '1002', categoryId: 'cat_1', name: { en: 'Latte', ar: 'لاتيه' }, basePrice: 3.5, costPrice: 1.2, image: 'https://placehold.co/300', sizes: [{ id: 's3', name: 'S', priceDelta: 0 }, { id: 's4', name: 'M', priceDelta: 0.75 }, { id: 's5', name: 'L', priceDelta: 1.25 }], modifiers: ['m_1', 'm_2', 'm_3', 'm_4', 'm_5', 'm_6', 'm_7', 'm_8', 'm_12', 'm_13'], stock: 40, isActive: true, type: 'PRODUCT' },
+    { id: 'i_3', sku: '1003', categoryId: 'cat_3', name: { en: 'Butter Croissant', ar: 'كرواسون زبدة' }, basePrice: 2.75, costPrice: 0.9, image: 'https://placehold.co/300', sizes: [{ id: 's6', name: 'M', priceDelta: 0 }], modifiers: [], stock: 25, isActive: true, type: 'PRODUCT' },
+    { id: 'i_4', sku: '1004', categoryId: 'cat_4', name: { en: 'Iced Americano', ar: 'أمريكانو بارد' }, basePrice: 3.0, costPrice: 0.7, image: 'https://placehold.co/300', sizes: [{ id: 's7', name: 'M', priceDelta: 0 }, { id: 's8', name: 'L', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 30, isActive: true, type: 'PRODUCT' },
+    { id: 'i_5', sku: '1005', categoryId: 'cat_2', name: { en: 'Green Tea', ar: 'شاي أخضر' }, basePrice: 2.25, costPrice: 0.5, image: 'https://placehold.co/300', sizes: [{ id: 's9', name: 'S', priceDelta: 0 }, { id: 's10', name: 'M', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 60, isActive: true, type: 'PRODUCT' },
+    { id: 'i_6', sku: '1006', categoryId: 'cat_5', name: { en: 'Cheesecake', ar: 'تشيز كيك' }, basePrice: 4.5, costPrice: 1.8, image: 'https://placehold.co/300', sizes: [{ id: 's11', name: 'Slice', priceDelta: 0 }], modifiers: [], stock: 12, isActive: true, type: 'PRODUCT' },
+    { id: 'i_7', sku: '1007', categoryId: 'cat_5', name: { en: 'Chocolate Muffin', ar: 'مافن شوكولاتة' }, basePrice: 3.25, costPrice: 1.1, image: 'https://placehold.co/300', sizes: [{ id: 's12', name: 'M', priceDelta: 0 }], modifiers: [], stock: 15, isActive: true, type: 'PRODUCT' },
+    { id: 'i_8', sku: '1008', categoryId: 'cat_1', name: { en: 'Cappuccino', ar: 'كابتشينو' }, basePrice: 3.75, costPrice: 1.3, image: 'https://placehold.co/300', sizes: [{ id: 's13', name: 'S', priceDelta: 0 }, { id: 's14', name: 'M', priceDelta: 0.75 }], modifiers: ['m_1', 'm_2', 'm_5', 'm_6', 'm_12', 'm_13'], stock: 35, isActive: true, type: 'PRODUCT' },
+    { id: 'raw_1', sku: 'R001', categoryId: 'cat_6', name: { en: 'White Sugar', ar: 'سكر أبيض' }, basePrice: 0, costPrice: 0.5, image: 'https://placehold.co/300', sizes: [], modifiers: [], stock: 100, isActive: true, type: 'RAW' },
+    { id: 'raw_2', sku: 'R002', categoryId: 'cat_6', name: { en: 'Fresh Milk', ar: 'حليب طازج' }, basePrice: 0, costPrice: 1.1, image: 'https://placehold.co/300', sizes: [], modifiers: [], stock: 50, isActive: true, type: 'RAW' },
+  ];
+}
+
+function getDefaultUsers() {
+  return [
+    { id: 'u_1', name: 'Cashier Account', pin: '1234', role: 'Cashier', isActive: true },
+    { id: 'u_3', name: 'Admin Manager', username: 'admin', password: 'admin', pin: '0000', role: 'Admin', isActive: true },
+    { id: 'u_4', name: 'System Owner', username: 'owner', password: 'owner', pin: '9999', role: 'admin', isActive: true, recoveryCode: 'BREW-MASTER-9999-RECOVERY' },
+  ];
+}
+
+function getTranslations() {
+  return {
+    en: {
+      dashboard: "Live Dashboard", pos: "POS", shifts: "Shifts", sales: "Sales", inventory: "Inventory",
+      purchases: "Purchases", expenses: "Expenses", treasury: "Treasury", staff: "Staff",
+      reports: "Reports", customers: "Customers", logs: "Audit Logs", settings: "Settings", branches: "Branches", transfers: "Transfers",
+      statements: "Statements", logout: "Logout", search: "Search...",
+      currentOrder: "Current Order", dineIn: "Dine-in", delivery: "Delivery",
+      subtotal: "Subtotal", vat: "VAT", total: "Total", cash: "Cash", card: "Card",
+      selectSize: "Select Size", itemNote: "Item Note", notePlaceholder: "Special instructions...",
+      addBasket: "Add to Basket", PAID: "Paid", PARTIALLY_PAID: "Partly Paid",
+      UNPAID: "Unpaid", VOIDED: "Voided",
+    },
+    ar: {
+      dashboard: "لوحة البيانات", pos: "نقطة البيع", shifts: "الورديات", sales: "المبيعات", inventory: "المخزون",
+      purchases: "المشتريات", expenses: "المصروفات", treasury: "الخزينة", staff: "الموظفين",
+      reports: "التقارير", customers: "العملاء", logs: "سجل العمليات", settings: "الإعدادات", branches: "الفروع", transfers: "التحويلات",
+      statements: "الكشوفات", logout: "تسجيل الخروج", search: "بحث...",
+      currentOrder: "الطلب الحالي", dineIn: "داخل المحل", delivery: "توصيل",
+      subtotal: "المجموع الجزئي", vat: "ضريبة القيمة المضافة", total: "الإجمالي", cash: "نقدي", card: "بطاقة",
+      selectSize: "اختر الحجم", itemNote: "ملاحظة الطلب", notePlaceholder: "أضف تعليمات خاصة...",
+      addBasket: "إضافة للسلة", PAID: "مدفوع", PARTIALLY_PAID: "مدفوع جزئياً",
+      UNPAID: "غير مدفوع", VOIDED: "ملغي",
+    }
+  };
+}
+
+function formatMoney(amount) {
+  const num = Number(amount) || 0;
+  const currency = window.appCurrency || 'EGP';
+  return `${num.toFixed(2)} ${currency}`;
+}
+
 function getRoleName(roleIdOrName) {
   if (!roleIdOrName) return '';
   if (roleIdOrName === 'Owner' || roleIdOrName === 'owner') return 'Owner';
@@ -111,102 +193,6 @@ function canAccess(user, tab, customPerms, customRolesList) {
   return perms.includes(tab);
 }
 
-// Inject Google Fonts
-const styleEl = document.createElement('link');
-styleEl.rel = 'stylesheet';
-styleEl.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap';
-document.head.appendChild(styleEl);
-const globalStyle = document.createElement('style');
-globalStyle.textContent = `
-  :root {
-    --accent-blue: #0066FF;
-    --accent-gold: #D4AF37;
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --bg-deep: #f1f5f9;
-    --bg-sidebar: #0f172a;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #475569;
-    --border-color: #cbd5e1;
-  }
-
-  [data-theme='dark'] {
-    --bg-main: #0a0a0c;
-    --bg-card: #151518;
-    --bg-deep: #0f0f12;
-    --bg-sidebar: #050505;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
-    --border-color: #222226;
-  }
-
-  /* Global Typography Fixes */
-  * { font-family: 'Inter', 'Cairo', sans-serif !important; }
-  [dir="rtl"], [dir="rtl"] * { 
-    font-family: 'Cairo', 'Inter', sans-serif !important; 
-    letter-spacing: normal !important; 
-    text-transform: none !important;
-  }
-  
-  /* Custom Visible Scrollbars */
-  ::-webkit-scrollbar { 
-    display: block !important; 
-    width: 6px; 
-    height: 6px; 
-  }
-  ::-webkit-scrollbar-track { background: var(--bg-deep); }
-  ::-webkit-scrollbar-thumb { 
-    background: #444; 
-    border-radius: 10px; 
-  }
-  ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
-  
-  /* Firefox */
-  * { scrollbar-width: thin; scrollbar-color: #444 var(--bg-deep); }
-  html, body, #root { background: var(--bg-main); color: var(--text-primary); line-height: 1.5; }
-  [dir="rtl"] body, [dir="rtl"] #root { line-height: 1.7; }
-
-  /* ⚡ BOOT PAINT SUPPRESSION — prevents white-flash before spinner mounts.
-     Class is added by bootFromCloud() and removed once boot resolves. */
-  body.sp-booting { visibility: hidden; }
-  body.sp-booting-ready { visibility: visible; }
-  input[type=number]::-webkit-inner-spin-button { display: none; }
-  button:focus { outline: none; }
-  
-  /* Alignment Helpers */
-  .text-start { text-align: start !important; }
-  .text-end { text-align: end !important; }
-
-  /* Fix Dark Mode Input Visibility */
-  input, select, textarea { 
-    color: var(--text-primary) !important;
-    background-color: var(--bg-deep) !important;
-    text-align: inherit;
-  }
-  [dir="rtl"] input, [dir="rtl"] select, [dir="rtl"] textarea { text-align: right !important; }
-  [dir="ltr"] input, [dir="ltr"] select, [dir="ltr"] textarea { text-align: left !important; }
-  input[type="number"] { color: var(--text-primary) !important; }
-  input::placeholder { color: var(--text-muted); opacity: 0.5; }
-
-  @media print {
-    @page { margin: 0; size: 80mm auto; }
-    html, body { width: 80mm; margin: 0; padding: 0; background: white !important; }
-    body * { visibility: hidden; }
-    #printable-receipt, #printable-receipt * { visibility: visible !important; color: black !important; }
-    #printable-receipt {
-      position: absolute; left: 0; top: 0; right: 0;
-      width: 76mm !important;
-      max-width: 76mm !important;
-      margin: 0 auto !important;
-      padding: 3mm !important;
-      box-sizing: border-box !important;
-      font-size: 11px !important;
-    }
-  }
-`;
-document.head.appendChild(globalStyle);
 
 function InvoiceTemplate({ order, currency, language, storeName, logo, header, footer, activeShift, users }) {
   if (!order) return null;
@@ -309,80 +295,7 @@ function ShiftReportTemplate({ shift, storeName, currency, isRtl, cashierName })
   );
 }
 
-// ============================================================
-// CONSTANTS & DATA
-// ============================================================
-const CATEGORIES = [
-  { id: 'cat_1', name: { en: 'Coffee', ar: 'قهوة' }, icon: '☕' },
-  { id: 'cat_2', name: { en: 'Tea', ar: 'شاي' }, icon: '🫖' },
-  { id: 'cat_3', name: { en: 'Pastries', ar: 'مخبوزات' }, icon: '🥐' },
-  { id: 'cat_4', name: { en: 'Cold Drinks', ar: 'مشروبات باردة' }, icon: '🥤' },
-  { id: 'cat_5', name: { en: 'Desserts', ar: 'حلويات' }, icon: '🍰' },
-  { id: 'cat_6', name: { en: 'Raw Materials', ar: 'مواد خام' }, icon: '🥛' },
-];
 
-const MODIFIERS = [
-  { id: 'm_1', name: { en: 'Regular Milk', ar: 'حليب عادي' }, priceDelta: 0, group: 'Milk' },
-  { id: 'm_2', name: { en: 'Lactose-Free', ar: 'خالي لاكتوز' }, priceDelta: 0.5, group: 'Milk' },
-  { id: 'm_3', name: { en: 'Almond Milk', ar: 'حليب لوز' }, priceDelta: 0.75, group: 'Milk' },
-  { id: 'm_4', name: { en: 'Oat Milk', ar: 'حليب شوفان' }, priceDelta: 0.75, group: 'Milk' },
-  { id: 'm_5', name: { en: 'No Sugar', ar: 'بدون سكر' }, priceDelta: 0, group: 'Sugar' },
-  { id: 'm_6', name: { en: '1 Sugar', ar: '١ سكر' }, priceDelta: 0, group: 'Sugar' },
-  { id: 'm_7', name: { en: '2 Sugar', ar: '٢ سكر' }, priceDelta: 0, group: 'Sugar' },
-  { id: 'm_8', name: { en: '3 Sugar', ar: '٣ سكر' }, priceDelta: 0, group: 'Sugar' },
-  { id: 'm_12', name: { en: 'Vanilla Syrup', ar: 'سيروب فانيلا' }, priceDelta: 0.5, group: 'Flavor' },
-  { id: 'm_13', name: { en: 'Caramel Syrup', ar: 'سيروب كاراميل' }, priceDelta: 0.5, group: 'Flavor' },
-];
-
-const INITIAL_ITEMS = [
-  { id: 'i_1', sku: '1001', categoryId: 'cat_1', name: { en: 'Espresso', ar: 'اسبريسو' }, basePrice: 2.5, costPrice: 0.8, image: 'https://images.unsplash.com/photo-1510707513151-471d1091ebb1?w=300', sizes: [{ id: 's1', name: 'S', priceDelta: 0 }, { id: 's2', name: 'M', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 50, isActive: true, type: 'PRODUCT' },
-  { id: 'i_2', sku: '1002', categoryId: 'cat_1', name: { en: 'Latte', ar: 'لاتيه' }, basePrice: 3.5, costPrice: 1.2, image: 'https://images.unsplash.com/photo-1536700503339-1e4b06520771?w=300', sizes: [{ id: 's3', name: 'S', priceDelta: 0 }, { id: 's4', name: 'M', priceDelta: 0.75 }, { id: 's5', name: 'L', priceDelta: 1.25 }], modifiers: ['m_1', 'm_2', 'm_3', 'm_4', 'm_5', 'm_6', 'm_7', 'm_8', 'm_12', 'm_13'], stock: 40, isActive: true, type: 'PRODUCT' },
-  { id: 'i_3', sku: '1003', categoryId: 'cat_3', name: { en: 'Butter Croissant', ar: 'كرواسون زبدة' }, basePrice: 2.75, costPrice: 0.9, image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=300', sizes: [{ id: 's6', name: 'M', priceDelta: 0 }], modifiers: [], stock: 25, isActive: true, type: 'PRODUCT' },
-  { id: 'i_4', sku: '1004', categoryId: 'cat_4', name: { en: 'Iced Americano', ar: 'أمريكانو بارد' }, basePrice: 3.0, costPrice: 0.7, image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300', sizes: [{ id: 's7', name: 'M', priceDelta: 0 }, { id: 's8', name: 'L', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 30, isActive: true, type: 'PRODUCT' },
-  { id: 'i_5', sku: '1005', categoryId: 'cat_2', name: { en: 'Green Tea', ar: 'شاي أخضر' }, basePrice: 2.25, costPrice: 0.5, image: 'https://images.unsplash.com/photo-1523906630133-f1cb050a1145?w=300', sizes: [{ id: 's9', name: 'S', priceDelta: 0 }, { id: 's10', name: 'M', priceDelta: 0.5 }], modifiers: ['m_5', 'm_6', 'm_7', 'm_8'], stock: 60, isActive: true, type: 'PRODUCT' },
-  { id: 'i_6', sku: '1006', categoryId: 'cat_5', name: { en: 'Cheesecake', ar: 'تشيز كيك' }, basePrice: 4.5, costPrice: 1.8, image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=300', sizes: [{ id: 's11', name: 'Slice', priceDelta: 0 }], modifiers: [], stock: 12, isActive: true, type: 'PRODUCT' },
-  { id: 'i_7', sku: '1007', categoryId: 'cat_5', name: { en: 'Chocolate Muffin', ar: 'مافن شوكولاتة' }, basePrice: 3.25, costPrice: 1.1, image: 'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec?w=300', sizes: [{ id: 's12', name: 'M', priceDelta: 0 }], modifiers: [], stock: 15, isActive: true, type: 'PRODUCT' },
-  { id: 'i_8', sku: '1008', categoryId: 'cat_1', name: { en: 'Cappuccino', ar: 'كابتشينو' }, basePrice: 3.75, costPrice: 1.3, image: 'https://images.unsplash.com/photo-1534778101976-62847782c213?w=300', sizes: [{ id: 's13', name: 'S', priceDelta: 0 }, { id: 's14', name: 'M', priceDelta: 0.75 }], modifiers: ['m_1', 'm_2', 'm_5', 'm_6', 'm_12', 'm_13'], stock: 35, isActive: true, type: 'PRODUCT' },
-  { id: 'raw_1', sku: 'R001', categoryId: 'cat_6', name: { en: 'White Sugar', ar: 'سكر أبيض' }, basePrice: 0, costPrice: 0.5, image: 'https://images.unsplash.com/photo-1581441363689-1f3c3c414635?w=300', sizes: [], modifiers: [], stock: 100, isActive: true, type: 'RAW' },
-  { id: 'raw_2', sku: 'R002', categoryId: 'cat_6', name: { en: 'Fresh Milk', ar: 'حليب طازج' }, basePrice: 0, costPrice: 1.1, image: 'https://images.unsplash.com/photo-1550583724-125581ae278c?w=300', sizes: [], modifiers: [], stock: 50, isActive: true, type: 'RAW' },
-];
-
-const DEFAULT_USERS = [
-  { id: 'u_1', name: 'Cashier Account', pin: '1234', role: 'Cashier', isActive: true },
-  { id: 'u_3', name: 'Admin Manager', username: 'admin', password: 'admin', pin: '0000', role: 'Admin', isActive: true },
-  { id: 'u_4', name: 'System Owner', username: 'owner', password: 'owner', pin: '9999', role: 'admin', isActive: true, recoveryCode: 'BREW-MASTER-9999-RECOVERY' },
-];
-
-const T = {
-  en: {
-    dashboard: "Live Dashboard", pos: "POS", shifts: "Shifts", sales: "Sales", inventory: "Inventory",
-    purchases: "Purchases", expenses: "Expenses", treasury: "Treasury", staff: "Staff",
-    reports: "Reports", customers: "Customers", logs: "Audit Logs", settings: "Settings", branches: "Branches", transfers: "Transfers",
-    statements: "Statements", logout: "Logout", search: "Search...",
-    currentOrder: "Current Order", dineIn: "Dine-in", delivery: "Delivery",
-    subtotal: "Subtotal", vat: "VAT", total: "Total", cash: "Cash", card: "Card",
-    selectSize: "Select Size", itemNote: "Item Note", notePlaceholder: "Special instructions...",
-    addBasket: "Add to Basket", PAID: "Paid", PARTIALLY_PAID: "Partly Paid",
-    UNPAID: "Unpaid", VOIDED: "Voided",
-  },
-  ar: {
-    dashboard: "لوحة البيانات", pos: "نقطة البيع", shifts: "الورديات", sales: "المبيعات", inventory: "المخزون",
-    purchases: "المشتريات", expenses: "المصروفات", treasury: "الخزينة", staff: "الموظفين",
-    reports: "التقارير", customers: "العملاء", logs: "سجل العمليات", settings: "الإعدادات", branches: "الفروع", transfers: "التحويلات",
-    statements: "الكشوفات", logout: "تسجيل الخروج", search: "بحث...",
-    currentOrder: "الطلب الحالي", dineIn: "داخل المحل", delivery: "توصيل",
-    subtotal: "المجموع الجزئي", vat: "ضريبة القيمة المضافة", total: "الإجمالي", cash: "نقدي", card: "بطاقة",
-    selectSize: "اختر الحجم", itemNote: "ملاحظة الطلب", notePlaceholder: "أضف تعليمات خاصة...",
-    addBasket: "إضافة للسلة", PAID: "مدفوع", PARTIALLY_PAID: "مدفوع جزئياً",
-    UNPAID: "غير مدفوع", VOIDED: "ملغي",
-  }
-};
-
-let appCurrency = 'EGP';
-const formatMoney = (amount) => {
-  const num = Number(amount) || 0;
-  return `${num.toFixed(2)} ${appCurrency}`;
-};
 
 // ============================================================
 // MODIFIER MODAL
@@ -6795,7 +6708,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
 // ============================================================
 // MAIN APP
 // ============================================================
-const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shiftAdvances = [], shiftDrawerLogs = []) => {
+function calculateExpectedCash(openingBalance, shiftOrders, shiftExpenses, shiftAdvances = [], shiftDrawerLogs = []) {
   const cashSales = shiftOrders
     .filter(o => o.paymentMethod === 'Cash' || !o.paymentMethod)
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
@@ -6807,23 +6720,23 @@ const calculateExpectedCash = (openingBalance, shiftOrders, shiftExpenses, shift
 
   const expected = (Number(openingBalance) || 0) + cashSales + drawerIn - (totalAdvances + totalExpenses + drawerOut);
   return expected;
-};
+}
 
-const getCookie = (name) => {
+function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
   return null;
-};
+}
 
-const setCookie = (name, value, days) => {
+function setCookie(name, value, days) {
   const date = new Date();
   date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
   const expires = `; expires=${date.toUTCString()}`;
   document.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Strict; Secure`;
-};
+}
 
-const checkSubscriptionStatus = (statusOrSettings, activationDateStr, expiryDateStr) => {
+function checkSubscriptionStatus(statusOrSettings, activationDateStr, expiryDateStr) {
   let status;
   let actDate;
   let expDate;
@@ -6873,9 +6786,9 @@ const checkSubscriptionStatus = (statusOrSettings, activationDateStr, expiryDate
   }
 
   return { status, daysLeft, expired: false };
-};
+}
 
-const getInitialSubscriptionStatus = () => {
+function getInitialSubscriptionStatus() {
   const localStatus = localStorage.getItem('pos_subscription_status');
   
   // Brand new install
@@ -6896,16 +6809,16 @@ const getInitialSubscriptionStatus = () => {
     return 'expired';
   }
   return result.status;
-};
+}
 
-const getInitialTrialDaysLeft = () => {
+function getInitialTrialDaysLeft() {
   const localStatus = localStorage.getItem('pos_subscription_status') || 'trial';
   const localTrialStart = localStorage.getItem('activationDate') || localStorage.getItem('pos_trial_start_date');
   const localSubEnd = localStorage.getItem('pos_subscription_end_date');
   
   const result = checkSubscriptionStatus(localStatus, localTrialStart, localSubEnd);
   return result.status === 'trial' ? result.daysLeft : null;
-};
+}
 // ============================================================
 // 404 / NOT FOUND SCREEN
 // Rendered for unauthorized /admin-master-u4 access attempts
@@ -7162,7 +7075,7 @@ export default function App() {
     const cached = localStorage.getItem('pos_current_user');
     return cached ? JSON.parse(cached) : null;
   });
-  const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('pos_users')) || DEFAULT_USERS);
+  const [users, setUsers] = useState([]);
   const customRolesHydrated = useRef(false);
   const [customRoles, setCustomRoles] = useState([]);
 
@@ -7272,8 +7185,8 @@ export default function App() {
     }
   }, [currency, taxRate, enableServiceFee, serviceFee, storeName, invoiceLogo, invoiceHeader, invoiceFooter, branchId, cloudReady, theme, language]);
 
-  const [categories, setCategories] = useState(() => JSON.parse(localStorage.getItem('pos_categories')) || CATEGORIES);
-  const [items, setItems] = useState(() => JSON.parse(localStorage.getItem('pos_items')) || INITIAL_ITEMS);
+  const [categories, setCategories] = useState([]);
+  const [items, setItems] = useState([]);
   const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('pos_orders')) || []);
   const [customers, setCustomers] = useState(() => JSON.parse(localStorage.getItem('pos_customers')) || [
     { id: 'cust_demo_1', name: 'Ahmed Mohamed', phone: '0100-555-1234', createdAt: new Date() },
@@ -7298,6 +7211,131 @@ export default function App() {
   // SUPABASE CLOUD BOOT: Load data from cloud on startup
   // =========================================================================
   useEffect(() => {
+    // Dynamic Style Injection
+    if (!document.getElementById('google-fonts-link')) {
+      const styleEl = document.createElement('link');
+      styleEl.id = 'google-fonts-link';
+      styleEl.rel = 'stylesheet';
+      styleEl.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap';
+      document.head.appendChild(styleEl);
+    }
+    if (!document.getElementById('luxury-app-styles')) {
+      const globalStyle = document.createElement('style');
+      globalStyle.id = 'luxury-app-styles';
+      globalStyle.textContent = `
+        :root {
+          --accent-blue: #0066FF;
+          --accent-gold: #D4AF37;
+          --bg-main: #f8fafc;
+          --bg-card: #ffffff;
+          --bg-deep: #f1f5f9;
+          --bg-sidebar: #0f172a;
+          --text-primary: #0f172a;
+          --text-secondary: #475569;
+          --text-muted: #475569;
+          --border-color: #cbd5e1;
+        }
+
+        [data-theme='dark'] {
+          --bg-main: #0a0a0c;
+          --bg-card: #151518;
+          --bg-deep: #0f0f12;
+          --bg-sidebar: #050505;
+          --text-primary: #f8fafc;
+          --text-secondary: #cbd5e1;
+          --text-muted: #64748b;
+          --border-color: #222226;
+        }
+
+        /* Global Typography Fixes */
+        * { font-family: 'Inter', 'Cairo', sans-serif !important; }
+        [dir="rtl"], [dir="rtl"] * { 
+          font-family: 'Cairo', 'Inter', sans-serif !important; 
+          letter-spacing: normal !important; 
+          text-transform: none !important;
+        }
+        
+        /* Custom Visible Scrollbars */
+        ::-webkit-scrollbar { 
+          display: block !important; 
+          width: 6px; 
+          height: 6px; 
+        }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { 
+          background: #444; 
+          border-radius: 10px; 
+        }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+        
+        /* Firefox */
+        * { scrollbar-width: thin; scrollbar-color: #444 var(--bg-deep); }
+        html, body, #root { background: var(--bg-main); color: var(--text-primary); line-height: 1.5; }
+        [dir="rtl"] body, [dir="rtl"] #root { line-height: 1.7; }
+
+        /* ⚡ BOOT PAINT SUPPRESSION — prevents white-flash before spinner mounts.
+           Class is added by bootFromCloud() and removed once boot resolves. */
+        body.sp-booting { visibility: hidden; }
+        body.sp-booting-ready { visibility: visible; }
+        input[type=number]::-webkit-inner-spin-button { display: none; }
+        button:focus { outline: none; }
+        
+        /* Alignment Helpers */
+        .text-start { text-align: start !important; }
+        .text-end { text-align: end !important; }
+
+        /* Fix Dark Mode Input Visibility */
+        input, select, textarea { 
+          color: var(--text-primary) !important;
+          background-color: var(--bg-deep) !important;
+          text-align: inherit;
+        }
+        [dir="rtl"] input, [dir="rtl"] select, [dir="rtl"] textarea { text-align: right !important; }
+        [dir="ltr"] input, [dir="ltr"] select, [dir="ltr"] textarea { text-align: left !important; }
+        input[type="number"] { color: var(--text-primary) !important; }
+        input::placeholder { color: var(--text-muted); opacity: 0.5; }
+
+        @media print {
+          @page { margin: 0; size: 80mm auto; }
+          html, body { width: 80mm; margin: 0; padding: 0; background: white !important; }
+          body * { visibility: hidden; }
+          #printable-receipt, #printable-receipt * { visibility: visible !important; color: black !important; }
+          #printable-receipt {
+            position: absolute; left: 0; top: 0; right: 0;
+            width: 76mm !important;
+            max-width: 76mm !important;
+            margin: 0 auto !important;
+            padding: 3mm !important;
+            box-sizing: border-box !important;
+            font-size: 11px !important;
+          }
+        }
+      `;
+      document.head.appendChild(globalStyle);
+    }
+
+    // Hydration from Local Storage (Fallbacks to top hoisted dynamic getter functions)
+    try {
+      const cachedUsers = localStorage.getItem('pos_users');
+      setUsers(cachedUsers ? JSON.parse(cachedUsers) : getDefaultUsers());
+    } catch (e) {
+      setUsers(getDefaultUsers());
+    }
+
+    try {
+      const cachedCats = localStorage.getItem('pos_categories');
+      setCategories(cachedCats ? JSON.parse(cachedCats) : getCategories());
+    } catch (e) {
+      setCategories(getCategories());
+    }
+
+    try {
+      const cachedItems = localStorage.getItem('pos_items');
+      setItems(cachedItems ? JSON.parse(cachedItems) : getInitialItems());
+    } catch (e) {
+      setItems(getInitialItems());
+    }
+
     let cancelled = false;
     // Suppress browser paint during boot to eliminate the white-flash artifact.
     // A 4-second safety timeout ensures visibility is always restored.
@@ -7451,9 +7489,9 @@ export default function App() {
               currency, tax_rate: taxRate, store_name: storeName, language, theme,
               subscription_status: 'trial', trial_start_date: trialStart
             });
-            for (const u of DEFAULT_USERS) await SB.saveUser(branch.id, u);
-            for (const c of CATEGORIES) await SB.saveCategory(branch.id, c);
-            for (const i of INITIAL_ITEMS) await SB.saveItem(branch.id, i);
+            for (const u of getDefaultUsers()) await SB.saveUser(branch.id, u);
+            for (const c of getCategories()) await SB.saveCategory(branch.id, c);
+            for (const i of getInitialItems()) await SB.saveItem(branch.id, i);
           }
           console.log('☁️ Cloud sync ready — Branch:', branch.id);
         } else {
