@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useOnlineStatus } from './useOnlineStatus';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import * as SB from './supabaseService';
 import { supabase } from './supabaseClient';
 import BranchManagement from './BranchManagement';
@@ -984,7 +986,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
   const cashierName = users.find(u => u.id === activeShift?.userId)?.name || 'System';
 
   const StatCard = ({ label, value, color = 'text-slate-900 dark:text-zinc-100', bg = 'bg-white dark:bg-[#151518]', border = 'border-zinc-200 dark:border-[#D4AF37]/20' }) => (
-    <div className={`${bg} ${border} border p-5 flex flex-col justify-between h-full transition-colors duration-200`}>
+    <div className={`${bg} ${border} border p-5 flex flex-col justify-between h-full transition-colors duration-200 luxury-card`}>
       <p className="text-[9px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest mb-2 border-b border-zinc-200 dark:border-[#D4AF37]/20 pb-1">{label}</p>
       <h2 className={`text-2xl font-black ${color}`}>{value}</h2>
     </div>
@@ -1009,7 +1011,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
 
       {/* ── DAILY PULSE (Hero Section) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="relative overflow-hidden bg-[var(--bg-sidebar)] p-6 border border-white/5 shadow-2xl">
+        <div className="relative overflow-hidden bg-[var(--bg-sidebar)] p-6 border border-white/5 shadow-2xl luxury-card">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#0066FF] blur-[80px] opacity-20 -mr-16 -mt-16"></div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[2px] mb-4">{isRtl ? 'إجمالي المبيعات' : 'Gross Revenue'}</p>
           <div className="flex items-baseline gap-2">
@@ -1026,7 +1028,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           </div>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative">
+        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative luxury-card">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[2px] mb-4">{isRtl ? 'التحصيل النقدي' : 'Cash Liquidity'}</p>
@@ -1037,7 +1039,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           <p className="text-[9px] text-[var(--text-muted)] mt-5 font-bold uppercase tracking-widest">{isRtl ? 'صافي الكاش المتوفر' : 'Net Cash in Hand'}</p>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative">
+        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] relative luxury-card">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[2px] mb-4">{isRtl ? 'مبيعات الكروت' : 'Digital Volume'}</p>
@@ -1048,7 +1050,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           <p className="text-[9px] text-[var(--text-muted)] mt-5 font-bold uppercase tracking-widest">{isRtl ? 'تحصيل الشبكة' : 'Card & Bank Entries'}</p>
         </div>
 
-        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] border-b-4 border-rose-500/40">
+        <div className="bg-[var(--bg-card)] p-6 border border-[var(--border-color)] border-b-4 border-rose-500/40 luxury-card">
           <p className="text-[10px] font-black text-rose-500/60 uppercase tracking-[2px] mb-4">{isRtl ? 'إجمالي المصاريف' : 'Expense Burn'}</p>
           <h2 className="text-3xl font-black text-rose-500 tracking-tighter">{formatMoney(stats.expenses)}</h2>
           <div className="mt-5 flex justify-between items-center">
@@ -1066,7 +1068,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
         <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Left Column: Real-time Feed */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden flex flex-col max-h-[650px]">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden flex flex-col max-h-[650px] luxury-card">
             <div className="px-6 py-5 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-deep)] shrink-0">
               <div>
                 <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-widest">{isRtl ? 'سجل العمليات الأخير' : 'Real-time Feed'}</h3>
@@ -1118,7 +1120,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           <div className="flex flex-col gap-6 max-h-[650px] overflow-y-auto pr-1">
             
             {/* Widget 1: Cross-Branch Performance */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0 luxury-card">
                <h3 className="text-xs font-black text-[#D4AF37] uppercase tracking-widest mb-5 flex items-center gap-2">
                  <span className="w-1.5 h-1.5 bg-[#D4AF37] rounded-full animate-pulse shadow-[0_0_8px_#D4AF37]"></span> 
                  {isRtl ? 'أداء الفروع المباشر' : 'Live Branch Performance'}
@@ -1142,7 +1144,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
             </div>
 
             {/* Widget 2: Top Products */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex-1 min-h-[220px] flex flex-col">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex-1 min-h-[220px] flex flex-col luxury-card">
                <h3 className="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest mb-4 shrink-0">{isRtl ? 'الأصناف الأكثر مبيعاً اليوم' : 'Top 5 Trending Products'}</h3>
                {topProducts.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center opacity-30 min-h-[120px]">
@@ -1174,7 +1176,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
             </div>
 
             {/* Widget 3: Hourly Sparkline */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 shrink-0 luxury-card">
                <h3 className="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest mb-4">{isRtl ? 'مؤشر كثافة المبيعات بالساعة' : 'Hourly Sales Velocity'}</h3>
                <div className="flex items-end gap-[2px] h-14 pt-2 border-b border-[#222]">
                  {hourlySales.map((pct, i) => (
@@ -1195,7 +1197,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
         <div className="space-y-8">
 
           {/* Shift Monitor Card */}
-          <div className={`p-6 border-t-4 ${activeShift ? 'bg-[var(--bg-card)] border-[#0066FF]' : 'bg-[var(--bg-sidebar)] border-slate-700'} shadow-xl`}>
+          <div className={`p-6 border-t-4 ${activeShift ? 'bg-[var(--bg-card)] border-[#0066FF]' : 'bg-[var(--bg-sidebar)] border-slate-700'} shadow-xl luxury-card`}>
             <div className="flex justify-between items-center mb-6">
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{isRtl ? 'مراقبة الوردية' : 'Line Status'}</p>
               <div className={`flex items-center gap-2 px-2 py-1 ${activeShift ? 'bg-blue-500/10 text-[#0066FF]' : 'bg-slate-800 text-slate-500'} text-[8px] font-black uppercase tracking-widest`}>
@@ -1212,7 +1214,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           </div>
 
           {/* Live Safe Cash Monitor (Multi-Branch) */}
-          <div className="bg-[#111] border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.05)] overflow-hidden">
+          <div className="bg-[#111] border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.05)] overflow-hidden luxury-card">
             <div className="p-4 border-b border-[#D4AF37]/20 flex justify-between items-center bg-gradient-to-r from-[#111] to-[#1a1a1a]">
               <h3 className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">{isRtl ? 'خزنة الفروع لايف' : 'Live Safe Monitor'}</h3>
               <span className="text-[10px] font-black text-[#0066FF] animate-pulse">● LIVE</span>
@@ -1228,7 +1230,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           </div>
 
           {/* Multi-Branch Low Stock Radar */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card">
             <div className="p-5 border-b border-[var(--border-color)] bg-[var(--bg-deep)] flex justify-between items-center">
               <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest">⚠️ {isRtl ? 'تنبيهات نواقص الفروع' : 'Global Inventory Radar'}</h3>
               <span className="text-[8px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-full tracking-tighter">CRITICAL</span>
@@ -1258,7 +1260,7 @@ function DashboardTab({ items, orders, customers, expenses, purchases, customerP
           </div>
 
           {/* Debt Center */}
-          <div className="bg-[var(--bg-card)] border border-rose-500/20 overflow-hidden shadow-lg shadow-rose-500/5">
+          <div className="bg-[var(--bg-card)] border border-rose-500/20 overflow-hidden shadow-lg shadow-rose-500/5 luxury-card">
             <div className="p-5 border-b border-rose-500/10 flex justify-between items-center">
               <h3 className="text-[10px] font-black text-[var(--text-primary)] uppercase tracking-widest">{isRtl ? 'مركز مديونيات العملاء' : 'Risk Management'}</h3>
               <div className="px-2 py-0.5 bg-rose-500 text-white text-[8px] font-black uppercase">Credit</div>
@@ -5585,6 +5587,167 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
+  const exportToPDF = async () => {
+    const element = document.createElement('div');
+    element.dir = isRtl ? 'rtl' : 'ltr';
+    element.style.position = 'fixed';
+    element.style.left = '-9999px';
+    element.style.top = '0';
+    element.style.width = '800px';
+    element.style.padding = '40px';
+    element.style.background = '#ffffff';
+    element.style.color = '#1e293b';
+    element.style.fontFamily = isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif";
+    
+    const fontLink = document.createElement('link');
+    fontLink.rel = 'stylesheet';
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;500;600;700;800;900&display=swap';
+    element.appendChild(fontLink);
+
+    const dateRangeStr = isRtl
+      ? `الفترة من: ${startDate} إلى: ${endDate}`
+      : `Period: From ${startDate} To ${endDate}`;
+    
+    const timestampStr = isRtl
+      ? `تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}`
+      : `Report Date: ${new Date().toLocaleString()}`;
+
+    const content = document.createElement('div');
+    content.style.marginTop = '20px';
+    content.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e40af; padding-bottom: 20px; margin-bottom: 30px;">
+        <div>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #1e40af;">🚀 StorePilot <span style="color: #64748b;">PRO</span></h1>
+          <p style="margin: 5px 0 0; font-size: 14px; font-weight: bold; color: #64748b;">${isRtl ? 'نظام إدارة نقاط البيع والتقارير المالية' : 'POS & Financial Management System'}</p>
+        </div>
+        <div style="text-align: ${isRtl ? 'left' : 'right'};">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 900; color: #1e293b;">${isRtl ? 'تقرير مالي تحليلي' : 'Financial Analytical Report'}</h2>
+          <p style="margin: 5px 0 0; font-size: 11px; color: #64748b; font-weight: bold;">${dateRangeStr}</p>
+          <p style="margin: 3px 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">${timestampStr}</p>
+        </div>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 900; color: #1e293b; margin-bottom: 15px; border-left: 4px solid #1e40af; padding-left: 10px; border-right: ${isRtl ? '4px solid #1e40af' : 'none'}; padding-right: ${isRtl ? '10px' : '0'};">
+        ${isRtl ? 'الملخص المالي التنفيذي' : 'Executive Financial Summary'}
+      </h3>
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 30px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px;">
+          <p style="margin: 0 0 5px; font-size: 10px; font-weight: bold; color: #64748b;">${isRtl ? 'إجمالي المبيعات' : 'Gross Revenue'}</p>
+          <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: #0066FF;">${formatMoney(summaryData.grossRevenue)}</h4>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px;">
+          <p style="margin: 0 0 5px; font-size: 10px; font-weight: bold; color: #64748b;">${isRtl ? 'تكلفة البضائع (COGS)' : 'Cost of Goods'}</p>
+          <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: #f97316;">${formatMoney(summaryData.cogs)}</h4>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px;">
+          <p style="margin: 0 0 5px; font-size: 10px; font-weight: bold; color: #64748b;">${isRtl ? 'إجمالي المصروفات' : 'Expenses'}</p>
+          <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: #ef4444;">${formatMoney(summaryData.totalExpenses)}</h4>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px;">
+          <p style="margin: 0 0 5px; font-size: 10px; font-weight: bold; color: #64748b;">${isRtl ? 'مديونيات الموردين' : 'Supplier Liabilities'}</p>
+          <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: #d97706;">${formatMoney(summaryData.totalSupplierLiabilities)}</h4>
+        </div>
+        <div style="background: ${summaryData.netProfit >= 0 ? '#ecfdf5' : '#fef2f2'}; border: 1px solid ${summaryData.netProfit >= 0 ? '#10b981' : '#ef4444'}; padding: 15px; border-radius: 12px;">
+          <p style="margin: 0 0 5px; font-size: 10px; font-weight: bold; color: #64748b;">${isRtl ? 'صافي الأرباح' : 'Net Profit'}</p>
+          <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: ${summaryData.netProfit >= 0 ? '#10b981' : '#ef4444'};">${formatMoney(summaryData.netProfit)}</h4>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 30px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;">
+        <h3 style="font-size: 13px; font-weight: 900; color: #1e293b; margin: 0 0 15px;">${isRtl ? 'خريطة توزيع السيولة والديون' : 'Liquidity & Debts Mapping'}</h3>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+          <div>
+            <p style="margin: 0 0 4px; font-size: 10px; color: #64748b; font-weight: bold;">${isRtl ? 'السيولة النقدية' : 'Cash Liquidity'}</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 900; color: #1e293b;">${formatMoney(salesData.cash)}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 4px; font-size: 10px; color: #64748b; font-weight: bold;">${isRtl ? 'سيولة الشبكة' : 'Card Liquidity'}</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 900; color: #1e293b;">${formatMoney(salesData.card)}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 4px; font-size: 10px; color: #64748b; font-weight: bold;">${isRtl ? 'المبيعات الآجلة (الفترة)' : 'Credit Sales (Range)'}</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 900; color: #1e293b;">${formatMoney(salesData.credit)}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 4px; font-size: 10px; color: #64748b; font-weight: bold;">${isRtl ? 'إجمالي ديون العملاء' : 'Total Client Arrears'}</p>
+            <p style="margin: 0; font-size: 14px; font-weight: 900; color: #ef4444;">${formatMoney(receivablesData.reduce((s, c) => s + c.balance, 0))}</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 900; color: #1e293b; margin-bottom: 15px; border-left: 4px solid #1e40af; padding-left: 10px; border-right: ${isRtl ? '4px solid #1e40af' : 'none'}; padding-right: ${isRtl ? '10px' : '0'};">
+        ${isRtl ? 'كشف حسابات الموردين والذمم الدائنة' : 'Supplier Ledger Accounts'}
+      </h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+            <th style="padding: 10px; font-size: 10px; font-weight: 900; text-align: ${isRtl ? 'right' : 'left'}; color: #64748b;">${isRtl ? 'المورد' : 'Supplier'}</th>
+            <th style="padding: 10px; font-size: 10px; font-weight: 900; text-align: ${isRtl ? 'right' : 'left'}; color: #64748b;">${isRtl ? 'إجمالي التوريد' : 'Total Purchased'}</th>
+            <th style="padding: 10px; font-size: 10px; font-weight: 900; text-align: ${isRtl ? 'right' : 'left'}; color: #64748b;">${isRtl ? 'المسدد' : 'Paid'}</th>
+            <th style="padding: 10px; font-size: 10px; font-weight: 900; text-align: ${isRtl ? 'right' : 'left'}; color: #64748b;">${isRtl ? 'المتبقي / الدين' : 'Outstanding Debt'}</th>
+            <th style="padding: 10px; font-size: 10px; font-weight: 900; text-align: ${isRtl ? 'right' : 'left'}; color: #64748b;">${isRtl ? 'حالة الحساب' : 'Status'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${supplierLedger.length === 0 
+            ? `<tr><td colspan="5" style="padding: 20px; font-size: 11px; text-align: center; color: #94a3b8;">${isRtl ? 'لا توجد مديونيات أو حسابات موردين' : 'No supplier accounts found'}</td></tr>`
+            : supplierLedger.map(sup => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px; font-size: 11px; font-weight: bold; color: #1e293b;">${sup.name}</td>
+                  <td style="padding: 10px; font-size: 11px; color: #334155; font-weight: bold;">${formatMoney(sup.totalPurchased)}</td>
+                  <td style="padding: 10px; font-size: 11px; color: #16a34a; font-weight: bold;">${formatMoney(sup.paid)}</td>
+                  <td style="padding: 10px; font-size: 11px; color: ${sup.remainingDebt > 0 ? '#ef4444' : '#64748b'}; font-weight: 900;">${formatMoney(sup.remainingDebt)}</td>
+                  <td style="padding: 10px; font-size: 10px; font-weight: bold; color: ${sup.remainingDebt > 0 ? '#d97706' : '#16a34a'};">
+                    ${sup.remainingDebt > 0 ? (isRtl ? 'مستحق السداد' : 'Due') : (isRtl ? 'خالص' : 'Settled')}
+                  </td>
+                </tr>
+              `).join('')
+          }
+        </tbody>
+      </table>
+
+      <div style="border-top: 1px dashed #e2e8f0; padding-top: 15px; text-align: center; font-size: 9px; color: #94a3b8; font-weight: bold;">
+        ${isRtl ? 'هذا المستند مستند مالي إلكتروني معتمد من نظام StorePilot PRO' : 'This is a certified electronic document generated by StorePilot PRO'}
+      </div>
+    `;
+    element.appendChild(content);
+    document.body.appendChild(element);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`StorePilot-Report-${startDate}-to-${endDate}.pdf`);
+    } catch (e) {
+      console.error('Failed to export PDF:', e);
+      alert(isRtl ? 'حدث خطأ أثناء تصدير ملف PDF' : 'Error exporting PDF document');
+    } finally {
+      document.body.removeChild(element);
+    }
+  };
+
   const inRange = (ts) => { 
     if (!ts) return false;
     try {
@@ -5812,10 +5975,22 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
         <div className="flex-1">
           <h2 className="text-xl font-black text-[var(--text-primary)] uppercase">{isRtl ? 'التقارير التحليلية' : 'Analytics & Reports'}</h2>
         </div>
-        <div className="flex gap-2 items-center bg-[var(--bg-card)] border border-[var(--border-color)] p-2 rounded-none">
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-xs font-black outline-none px-2" />
-          <span className="text-slate-300 font-black">→</span>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-xs font-black outline-none px-2" />
+        <div className="flex gap-3 items-center flex-wrap">
+          {/* Export PDF Button */}
+          <button
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase flex items-center gap-2 transition-colors border border-rose-700/20"
+          >
+            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 384 512">
+              <path d="M369.9 97.9L286 14C277 5 264.8-.1 252.1-.1H48C21.5 0 0 21.5 0 48v416c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48V131.9c0-12.7-5.1-25-14.1-34zM332.1 128H256V51.9l76.1 76.1zM48 464V48h160v104c0 13.3 10.7 24 24 24h104v288H48zm250.2-143.7c-9-12-28.7-25-50.2-27.6-21.3-7.4-44-16.7-64-28-10.4-17.6-21-38.3-28.7-59.5-3.3-10.3-6.2-22.3-5-34 1.3-12.3 8.3-24 20-27.5 11.5-3.4 22.8 2 28.5 13.3 7 14 1.8 33-3.6 51.5 10.8 19 25 36.8 40.7 52 23 7 48.7 10 68 8.8 17.5-1.2 31.7 4 38.3 12 6 7.4 5.3 20.3-1.6 27.5-6.8 7.3-19.3 8-36 7zm-201-10c7.8-13.5 18-36 24.3-57-6 16.5-13.8 32-24.3 46v11zm158-69c-14-11.4-25-23.7-33-35.8 4 10.5 9.7 21 16.6 30.6 5.3 4 10.7 7.7 16.4 11.2v-6zm36.8 43.6c8.3.3 14.3-1.7 17.4-4.8 2-2 3.6-5.8 1.6-8.6-3.8-5.3-17.4-6.3-33-4.8 5 3.3 9.7 10 14 18.2zM128 393.6c-5.8 11.5-10.2 18-14.3 18-2 0-3.6-1.5-4-4.7-.5-4.4 2.5-13.3 8.7-26 2.3 4 5.2 8.3 9.6 12.7z"/>
+            </svg>
+            {isRtl ? 'تصدير التقرير (PDF)' : 'Export PDF'}
+          </button>
+          <div className="flex gap-2 items-center bg-[var(--bg-card)] border border-[var(--border-color)] p-2 rounded-none">
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-xs font-black outline-none px-2" />
+            <span className="text-slate-300 font-black">→</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-xs font-black outline-none px-2" />
+          </div>
         </div>
       </div>
 
@@ -5831,7 +6006,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
           <div className="space-y-6">
             {/* 1. Executive Financial Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div>
                   <span className="text-[18px] mb-2 block">📈</span>
                   <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -5841,7 +6016,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
                 <p className="text-2xl font-black text-[#0066FF]">{formatMoney(summaryData.grossRevenue)}</p>
               </div>
 
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div>
                   <span className="text-[18px] mb-2 block">🏷️</span>
                   <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -5851,7 +6026,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
                 <p className="text-2xl font-black text-orange-500">{formatMoney(summaryData.cogs)}</p>
               </div>
 
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div>
                   <span className="text-[18px] mb-2 block">💸</span>
                   <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -5861,7 +6036,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
                 <p className="text-2xl font-black text-rose-500">{formatMoney(summaryData.totalExpenses)}</p>
               </div>
 
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div>
                   <span className="text-[18px] mb-2 block">🤝</span>
                   <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -5871,7 +6046,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
                 <p className="text-2xl font-black text-amber-500">{formatMoney(summaryData.totalSupplierLiabilities)}</p>
               </div>
 
-              <div className="border p-5 flex flex-col justify-between" style={{
+              <div className="border p-5 flex flex-col justify-between luxury-card" style={{
                 backgroundColor: 'var(--bg-card)',
                 borderColor: summaryData.netProfit >= 0 ? '#10b981' : '#ef4444',
                 borderWidth: '1.5px'
@@ -5893,7 +6068,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
             {/* 2. Middle Section: Chart + Customer Debts & Liquidity */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Cash Flow Timeline Chart */}
-              <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                   <div>
                     <h3 className="font-black text-[var(--text-primary)] text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -6050,7 +6225,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
               </div>
 
               {/* Liquidity Mapping & Customer Arrears */}
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <div>
                   <h3 className="font-black text-[var(--text-primary)] text-sm mb-1" style={{ color: 'var(--text-primary)' }}>
                     {isRtl ? 'سيولة المحل ومستحقات العملاء' : 'Liquidity & Receivables Mapping'}
@@ -6102,7 +6277,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
             </div>
 
             {/* 3. Supplier Accounts Ledger Table */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <div className="p-5 border-b border-[var(--border-color)] flex justify-between items-center flex-wrap gap-2" style={{ borderColor: 'var(--border-color)' }}>
                 <div>
                   <h3 className="font-black text-[var(--text-primary)] text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -6167,29 +6342,29 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                ['bg-slate-900 text-[var(--text-primary)]', isRtl ? 'إجمالي المبيعات' : 'Gross Sales', salesData.total, 'text-teal-400'],
-                ['bg-emerald-50 border border-emerald-100', isRtl ? 'نقدي' : 'Cash', salesData.cash, 'text-[#0066FF]'],
-                ['bg-[#1a1a1a] border border-teal-100', isRtl ? 'بطاقة' : 'Card', salesData.card, 'text-[#0066FF]'],
-                ['bg-amber-50 border border-amber-100', isRtl ? 'آجل' : 'Credit', salesData.credit, 'text-amber-600'],
+                ['bg-slate-900 text-[var(--text-primary)] border border-slate-800', isRtl ? 'إجمالي المبيعات' : 'Gross Sales', salesData.total, 'text-teal-400'],
+                ['bg-emerald-50/10 border border-emerald-500/20', isRtl ? 'نقدي' : 'Cash', salesData.cash, 'text-[#0066FF]'],
+                ['bg-purple-50/10 border border-purple-500/20', isRtl ? 'بطاقة' : 'Card', salesData.card, 'text-purple-400'],
+                ['bg-amber-50/10 border border-amber-500/20', isRtl ? 'آجل' : 'Credit', salesData.credit, 'text-amber-500'],
               ].map(([bg, label, val, color]) => (
-                <div key={label} className={`${bg} p-5 rounded-none`}>
+                <div key={label} className={`${bg} p-5 luxury-card`}>
                   <p className="text-[9px] font-black uppercase opacity-60 mb-1">{label}</p>
                   <p className={`text-2xl font-black ${color}`}>{formatMoney(val)}</p>
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none p-5">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-2">{isRtl ? 'صافي المبيعات (بعد الضريبة)' : 'Net Sales (ex. VAT)'}</p>
                 <p className="text-3xl font-black text-[var(--text-primary)]">{formatMoney(salesData.net)}</p>
                 <p className="text-xs text-[var(--text-muted)] font-bold mt-1">VAT: {formatMoney(salesData.vat)}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none p-5">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-2">{isRtl ? 'عدد الفواتير' : 'Invoice Count'}</p>
                 <p className="text-3xl font-black text-[var(--text-primary)]">{salesData.count}</p>
                 <p className="text-xs text-[var(--text-muted)] font-bold mt-1">{isRtl ? 'متوسط الفاتورة:' : 'Avg:'} {formatMoney(salesData.count > 0 ? salesData.total / salesData.count : 0)}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none p-5">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-2">{isRtl ? 'أكثر الأيام مبيعاً' : 'Best Day'}</p>
                 {Object.entries(salesData.byDay).sort(([, a], [, b]) => b - a).slice(0, 1).map(([d, v]) => (
                   <div key={d}><p className="text-xl font-black text-[var(--text-primary)]">{formatMoney(v)}</p><p className="text-xs text-[var(--text-muted)] font-bold mt-1">{d}</p></div>
@@ -6198,7 +6373,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
               </div>
             </div>
             {/* Top Items */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none overflow-hidden">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card">
               <div className="p-5 border-b border-[var(--border-color)]"><h3 className="font-black text-[var(--text-primary)] uppercase">{isRtl ? 'أعلى المنتجات مبيعاً' : 'Top Selling Items'}</h3></div>
               {salesData.topItems.length === 0 ? <div className="h-32 flex items-center justify-center text-slate-300 font-black uppercase text-xs">{isRtl ? 'لا بيانات' : 'No data'}</div> :
                 salesData.topItems.map((item, i) => (
@@ -6221,20 +6396,20 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
         {view === 'expenses' && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-rose-50 border border-rose-100 p-5 rounded-none">
+              <div className="bg-rose-50/10 border border-rose-500/20 p-5 luxury-card">
                 <p className="text-[9px] font-black text-rose-400 uppercase mb-1">{isRtl ? 'إجمالي المصروفات' : 'Total Expenses'}</p>
                 <p className="text-3xl font-black text-rose-600">{formatMoney(expensesData.total)}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 rounded-none">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'عدد القيود' : 'Count'}</p>
                 <p className="text-3xl font-black text-[var(--text-primary)]">{expensesData.filtered.length}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 rounded-none">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'متوسط المصروف' : 'Avg Expense'}</p>
                 <p className="text-3xl font-black text-[var(--text-primary)]">{formatMoney(expensesData.filtered.length > 0 ? expensesData.total / expensesData.filtered.length : 0)}</p>
               </div>
             </div>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none overflow-hidden">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card">
               <div className="p-5 border-b border-[var(--border-color)]"><h3 className="font-black text-[var(--text-primary)] uppercase">{isRtl ? 'تفصيل المصروفات' : 'Expense Breakdown'}</h3></div>
               {expensesData.byName.map(([name, amount]) => (
                 <div key={name} className="flex items-center justify-between p-4 border-b border-slate-50 hover:bg-[var(--bg-deep)]">
@@ -6258,22 +6433,22 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 ['bg-[var(--bg-card)] border-[var(--border-color)]', isRtl ? 'إجمالي الأصناف' : 'Total Items', inventoryData.totalItems, 'text-[var(--text-primary)]'],
-                ['bg-rose-50 border-rose-100', isRtl ? 'نافذ من المخزون' : 'Out of Stock', inventoryData.outOfStock.length, 'text-rose-600'],
-                ['bg-amber-50 border-amber-100', isRtl ? 'مخزون منخفض' : 'Low Stock', inventoryData.lowStock.length, 'text-amber-600'],
-                ['bg-emerald-50 border-emerald-100', isRtl ? 'قيمة التكلفة' : 'Cost Value', formatMoney(inventoryData.costValuation), 'text-[#0066FF]'],
+                ['bg-rose-50/10 border-rose-500/20', isRtl ? 'نافذ من المخزون' : 'Out of Stock', inventoryData.outOfStock.length, 'text-rose-600'],
+                ['bg-amber-50/10 border-amber-500/20', isRtl ? 'مخزون منخفض' : 'Low Stock', inventoryData.lowStock.length, 'text-amber-600'],
+                ['bg-emerald-50/10 border-emerald-500/20', isRtl ? 'قيمة التكلفة' : 'Cost Value', formatMoney(inventoryData.costValuation), 'text-[#0066FF]'],
               ].map(([bg, label, val, color]) => (
-                <div key={label} className={`bg-[var(--bg-card)] ${bg} border p-5 rounded-none`}>
+                <div key={label} className={`bg-[var(--bg-card)] ${bg} border p-5 luxury-card`}>
                   <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-1">{label}</p>
                   <p className={`text-2xl font-black ${color}`}>{val}</p>
                 </div>
               ))}
             </div>
             {inventoryData.lowStock.length > 0 && (
-              <div className="bg-amber-50 border border-amber-100 rounded-none p-5">
+              <div className="bg-amber-50/10 border border-amber-500/20 p-5 luxury-card">
                 <h3 className="font-black text-amber-700 uppercase text-sm mb-3">⚠️ {isRtl ? 'أصناف تحتاج إعادة توريد' : 'Items Need Restocking'}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {inventoryData.lowStock.map(item => (
-                    <div key={item.id} className="bg-[var(--bg-card)] rounded-none p-4 border border-amber-100">
+                    <div key={item.id} className="bg-[var(--bg-card)] p-4 border border-amber-100 luxury-card">
                       <p className="font-black text-[var(--text-primary)] text-sm truncate">{item.name[language]}</p>
                       <p className={`font-black text-lg ${item.stock <= 0 ? 'text-rose-600' : 'text-amber-600'}`}>{item.stock} {isRtl ? 'متبقي' : 'left'}</p>
                     </div>
@@ -6281,7 +6456,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
                 </div>
               </div>
             )}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none overflow-hidden">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card">
               <div className="p-5 border-b border-[var(--border-color)] flex justify-between items-center">
                 <h3 className="font-black text-[var(--text-primary)] uppercase">{isRtl ? 'قائمة الأصناف' : 'Inventory List'}</h3>
                 <span className="text-[10px] font-black text-[var(--text-muted)]">{isRtl ? 'قيمة البيع:' : 'Retail Value:'} {formatMoney(inventoryData.retailValuation)}</span>
@@ -6312,21 +6487,21 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
         {view === 'receivables' && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-rose-50 border border-rose-100 p-5 rounded-none">
+              <div className="bg-rose-50/10 border border-rose-500/20 p-5 luxury-card">
                 <p className="text-[9px] font-black text-rose-400 uppercase mb-1">{isRtl ? 'إجمالي الذمم' : 'Total Receivables'}</p>
                 <p className="text-3xl font-black text-rose-600">{formatMoney(receivablesData.reduce((s, c) => s + c.balance, 0))}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 rounded-none">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'عدد العملاء المدينين' : 'Debtors'}</p>
                 <p className="text-3xl font-black text-[var(--text-primary)]">{receivablesData.length}</p>
               </div>
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 rounded-none">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 luxury-card">
                 <p className="text-[9px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'أعلى دين' : 'Highest Debt'}</p>
                 <p className="text-2xl font-black text-[var(--text-primary)]">{receivablesData.length > 0 ? formatMoney(receivablesData[0].balance) : '—'}</p>
                 {receivablesData.length > 0 && <p className="text-xs text-[var(--text-muted)] font-bold mt-1">{receivablesData[0].name}</p>}
               </div>
             </div>
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none overflow-hidden">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden luxury-card">
               <div className="p-5 border-b border-[var(--border-color)]"><h3 className="font-black text-[var(--text-primary)] uppercase">{isRtl ? 'كشف حساب العملاء' : 'Customer Balances'}</h3></div>
               {receivablesData.length === 0 ? (
                 <div className="h-40 flex flex-col items-center justify-center text-slate-300"><span className="text-5xl">✅</span><p className="font-black uppercase text-xs mt-2">{isRtl ? 'لا ذمم متأخرة' : 'No outstanding debts'}</p></div>

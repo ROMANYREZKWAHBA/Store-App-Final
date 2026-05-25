@@ -12,9 +12,11 @@
 :root {
   /* ── Core Backgrounds */
   --bg-deep:    #f8fafc;
+  --bg-main:    #f8fafc;
   --bg-card:    #ffffff;
   --bg-sidebar: #ffffff;
   --bg-header:  #ffffff;
+  --radius-card: 24px;
 
   /* ── Borders */
   --border-color: #e2e8f0;
@@ -47,6 +49,7 @@
 /* ── Dark Mode Override (persisted via pos_theme=dark) */
 [data-theme="dark"] {
   --bg-deep:    #0B0F19;
+  --bg-main:    #0B0F19;
   --bg-card:    #1E293B;
   --bg-sidebar: #0B0F19;
   --bg-header:  #1E293B;
@@ -94,10 +97,24 @@ body[dir="rtl"] {
    modern rounded corners via the `.enterprise-ui` wrapper.
 ================================================================= */
 
-/* GLOBAL sharp-edge rule — applied to all internal screens */
-*:not(.enterprise-ui, .enterprise-ui *, .login-rounded, .login-rounded *) {
+/* GLOBAL sharp-edge rule — applied to all internal screens. Exempts luxury curved elements. */
+*:not(.enterprise-ui, .enterprise-ui *, .login-rounded, .login-rounded *, .luxury-card, .luxury-card *) {
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+/* Luxury Curved Card style */
+.luxury-card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-card, 24px) !important;
+  border: 1.5px solid var(--border-color);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04) !important;
+  overflow: hidden;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+[data-theme="dark"] .luxury-card {
+  box-shadow: 0 12px 40px -15px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Enterprise UI surfaces — allow Tailwind rounded-* classes */
