@@ -6,11 +6,13 @@ import { fetchActiveBranches } from './branchService';
 // STOCK TRANSFERS — Two-Step Approval Workflow
 // ============================================================
 
-const STATUS = {
-  pending:  { en: 'Pending',  ar: 'قيد الانتظار', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  approved: { en: 'Approved', ar: 'تم القبول',     color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  rejected: { en: 'Rejected', ar: 'مرفوض',         color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
-};
+function getStatusMapping() {
+  return {
+    pending:  { en: 'Pending',  ar: 'قيد الانتظار', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+    approved: { en: 'Approved', ar: 'تم القبول',     color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+    rejected: { en: 'Rejected', ar: 'مرفوض',         color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
+  };
+}
 
 function NewTransferModal({ isOpen, onClose, onSubmit, items, currentBranchId, isRtl, currentUser }) {
   const [branches, setBranches] = useState([]);
@@ -257,7 +259,7 @@ export default function StockTransfersScreen({ currentUser, branchId, items, lan
             {filtered.map((t) => {
               const isIncoming = t.to_branch_id === branchId;
               const isPending = t.status === 'pending';
-              const st = STATUS[t.status] || STATUS.pending;
+              const st = getStatusMapping()[t.status] || getStatusMapping().pending;
               const itemName = isRtl ? (t.item_name_ar || t.item_name_en) : t.item_name_en;
 
               return (

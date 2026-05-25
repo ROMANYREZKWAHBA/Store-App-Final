@@ -82,21 +82,20 @@ function SystemHealthBar({ isRtl }) {
   );
 }
 
-// ──────────────────────────────────────────────────────────
-// RECENT ACTIVITY LOG FEED
-// ──────────────────────────────────────────────────────────
-const SEED_EVENTS = [
-  { id: 1, type: 'signup',   icon: '👤', label_ar: 'مالك جديد مسجّل',          label_en: 'New Owner Registered',        ts: -120  },
-  { id: 2, type: 'sub',      icon: '⚡', label_ar: 'فرع اشترك في خطة شهرية',   label_en: 'Branch Subscribed — Monthly Plan', ts: -300 },
-  { id: 3, type: 'invite',   icon: '🔗', label_ar: 'رابط دعوة موظف تم توليده', label_en: 'Staff Invite Link Generated', ts: -540  },
-  { id: 4, type: 'login',    icon: '🔐', label_ar: 'كاشير سجّل دخولاً جديداً', label_en: 'Cashier Login Recorded',      ts: -780  },
-  { id: 5, type: 'upgrade',  icon: '🎉', label_ar: 'اشتراك تمت ترقيته',        label_en: 'Subscription Upgraded',       ts: -1020 },
-  { id: 6, type: 'branch',   icon: '🏢', label_ar: 'فرع جديد تم إنشاؤه',       label_en: 'New Branch Provisioned',      ts: -1500 },
-];
+function getSeedEvents() {
+  return [
+    { id: 1, type: 'signup',   icon: '👤', label_ar: 'مالك جديد مسجّل',          label_en: 'New Owner Registered',        ts: -120  },
+    { id: 2, type: 'sub',      icon: '⚡', label_ar: 'فرع اشترك في خطة شهرية',   label_en: 'Branch Subscribed — Monthly Plan', ts: -300 },
+    { id: 3, type: 'invite',   icon: '🔗', label_ar: 'رابط دعوة موظف تم توليده', label_en: 'Staff Invite Link Generated', ts: -540  },
+    { id: 4, type: 'login',    icon: '🔐', label_ar: 'كاشير سجّل دخولاً جديداً', label_en: 'Cashier Login Recorded',      ts: -780  },
+    { id: 5, type: 'upgrade',  icon: '🎉', label_ar: 'اشتراك تمت ترقيته',        label_en: 'Subscription Upgraded',       ts: -1020 },
+    { id: 6, type: 'branch',   icon: '🏢', label_ar: 'فرع جديد تم إنشاؤه',       label_en: 'New Branch Provisioned',      ts: -1500 },
+  ];
+}
 
 function ActivityFeed({ isRtl, users }) {
   const [events, setEvents] = useState(() =>
-    SEED_EVENTS.map(e => ({ ...e, timestamp: new Date(Date.now() + e.ts * 1000) }))
+    getSeedEvents().map(e => ({ ...e, timestamp: new Date(Date.now() + e.ts * 1000) }))
   );
 
   // Push live event whenever a new user appears

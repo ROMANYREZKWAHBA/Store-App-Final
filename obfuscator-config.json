@@ -10,7 +10,7 @@
   "stringArrayEncoding": [
     "base64"
   ],
-  "renameGlobals": true,
+  "renameGlobals": false,
   "unicodeEscapeSequence": false,
   "reservedStrings": [
     "^VITE_.*",
