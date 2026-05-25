@@ -804,7 +804,7 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
                   disabled={!activeShift || item.stock <= 0}
                   className={`group relative bg-[var(--bg-card)] rounded-none p-4 shadow-none hover:shadow-none transition-all duration-300 border border-[var(--border-color)] flex flex-col text-start active:scale-[0.97] ${(!activeShift || item.stock <= 0) ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
                   <div className="aspect-square rounded-none bg-[var(--bg-deep)] mb-3 overflow-hidden relative shadow-none">
-                    <img src={item.image} onError={e => e.target.src = 'https://via.placeholder.com/300x300?text=☕'}
+                    <img src={item.image} onError={e => e.target.src = 'https://placehold.co/300x300?text=☕'}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name[language]} />
                     <div className={`absolute top-2 ${isRtl ? 'left-2' : 'right-2'} px-2 py-0.5 rounded-none ${badge.color} text-[var(--text-primary)] text-[8px] font-black`}>{badge.label}</div>
                     {inCart && (
@@ -1860,7 +1860,7 @@ function InventoryScreen({ items, categories, modifiers, onAddCategory, onAddIte
       costPrice: parseFloat(form.costPrice) || 0,
       categoryId: form.categoryId,
       stock: parseInt(form.stock) || 0,
-      image: form.image || 'https://via.placeholder.com/300x300?text=☕',
+      image: form.image || 'https://placehold.co/300x300?text=☕',
       sizes: editItem?.sizes || [{ id: 'sz1', name: 'M', priceDelta: 0 }],
       modifiers: form.itemModifiers,
       isActive: true,
@@ -5578,13 +5578,22 @@ function TreasuryScreen({ orders, purchases, expenses, vouchers, customerPayment
 // ============================================================
 // REPORTS SCREEN
 // ============================================================
-function ReportsScreen({ orders, purchases, expenses, items, customers, customerPayments, language }) {
+function ReportsScreen({ orders, purchases, expenses, items, customers, customerPayments, language, vouchers = [] }) {
   const isRtl = language === 'ar';
-  const [view, setView] = useState('sales');
+  const [view, setView] = useState('summary');
   const [startDate, setStartDate] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [hoveredPoint, setHoveredPoint] = useState(null);
 
-  const inRange = (ts) => { const d = (ts instanceof Date ? ts : new Date(ts)).toISOString().split('T')[0]; return d >= startDate && d <= endDate; };
+  const inRange = (ts) => { 
+    if (!ts) return false;
+    try {
+      const d = (ts instanceof Date ? ts : new Date(ts)).toISOString().split('T')[0]; 
+      return d >= startDate && d <= endDate; 
+    } catch(e) {
+      return false;
+    }
+  };
 
   const salesData = useMemo(() => {
     const filtered = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && inRange(o.timestamp));
@@ -5633,11 +5642,167 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
     return { total, filtered, byName: Object.entries(byName).sort((a, b) => b[1] - a[1]) };
   }, [expenses, startDate, endDate]);
 
+  // Executive Summary and Net Profit Calculations
+  const summaryData = useMemo(() => {
+    const rangeOrders = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && inRange(o.timestamp));
+    const grossRevenue = rangeOrders.reduce((s, o) => s + o.total, 0);
+
+    const cogs = rangeOrders.reduce((sum, order) => {
+      return sum + order.items.reduce((itemSum, itemLine) => {
+        const currentItem = items.find(i => i.id === itemLine.itemId);
+        const cost = currentItem ? (currentItem.costPrice || 0) : 0;
+        return itemSum + (cost * itemLine.quantity);
+      }, 0);
+    }, 0);
+
+    const rangeExpenses = expenses.filter(e => inRange(e.timestamp));
+    const totalExpenses = rangeExpenses.reduce((s, e) => s + e.amount, 0);
+
+    const totalSupplierLiabilities = purchases.reduce((s, p) => s + (p.remainingAmount || 0), 0);
+
+    const netProfit = grossRevenue - (cogs + totalExpenses);
+
+    return {
+      grossRevenue,
+      cogs,
+      totalExpenses,
+      totalSupplierLiabilities,
+      netProfit
+    };
+  }, [orders, expenses, purchases, items, startDate, endDate]);
+
+  // Supplier ledger
+  const supplierLedger = useMemo(() => {
+    const names = [...new Set([...purchases.map(p => p.supplierName), ...vouchers.map(v => v.supplierName)].filter(Boolean))];
+    return names.map(name => {
+      const suppPurchases = purchases.filter(p => p.supplierName === name);
+      const totalPurchased = suppPurchases.reduce((s, p) => s + p.total, 0);
+      const remainingDebt = suppPurchases.reduce((s, p) => s + (p.remainingAmount || 0), 0);
+      const paid = totalPurchased - remainingDebt;
+      return {
+        name,
+        totalPurchased,
+        paid,
+        remainingDebt
+      };
+    });
+  }, [purchases, vouchers]);
+
+  // Cash flow timeline calculations
+  const daysList = useMemo(() => {
+    const list = [];
+    let curr = new Date(startDate);
+    const end = new Date(endDate);
+    let count = 0;
+    while (curr <= end && count < 100) {
+      list.push(curr.toISOString().split('T')[0]);
+      curr.setDate(curr.getDate() + 1);
+      count++;
+    }
+    return list;
+  }, [startDate, endDate]);
+
+  const dailyFlows = useMemo(() => {
+    return daysList.map(day => {
+      const dayOrders = orders.filter(o => {
+        const ts = o.timestamp instanceof Date ? o.timestamp : new Date(o.timestamp);
+        return ts.toISOString().split('T')[0] === day && o.status !== 'VOIDED' && o.status !== 'REFUNDED';
+      });
+      const inflow = dayOrders.reduce((s, o) => s + o.total, 0);
+
+      const dayExpenses = expenses.filter(e => {
+        const ts = e.timestamp instanceof Date ? e.timestamp : new Date(e.timestamp);
+        return ts.toISOString().split('T')[0] === day;
+      });
+      const dayVouchers = vouchers.filter(v => {
+        const ts = v.timestamp instanceof Date ? v.timestamp : new Date(v.timestamp);
+        return ts.toISOString().split('T')[0] === day;
+      });
+      const outflow = dayExpenses.reduce((s, e) => s + e.amount, 0) + dayVouchers.reduce((s, v) => s + v.amount, 0);
+
+      return {
+        day,
+        inflow,
+        outflow
+      };
+    });
+  }, [daysList, orders, expenses, vouchers]);
+
+  const maxVal = useMemo(() => {
+    const vals = dailyFlows.map(f => Math.max(f.inflow, f.outflow));
+    return Math.max(...vals, 100);
+  }, [dailyFlows]);
+
+  const width = 500;
+  const height = 200;
+  const paddingLeft = 45;
+  const paddingRight = 10;
+  const paddingTop = 20;
+  const paddingBottom = 30;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const points = useMemo(() => {
+    return dailyFlows.map((f, i) => {
+      const x = paddingLeft + (i / Math.max(daysList.length - 1, 1)) * chartWidth;
+      const yInflow = paddingTop + chartHeight - (f.inflow / maxVal) * chartHeight;
+      const yOutflow = paddingTop + chartHeight - (f.outflow / maxVal) * chartHeight;
+      return { x, yInflow, yOutflow, day: f.day, inflow: f.inflow, outflow: f.outflow };
+    });
+  }, [dailyFlows, maxVal, daysList, chartWidth, chartHeight]);
+
+  const bottomY = paddingTop + chartHeight;
+
+  const inflowLineD = useMemo(() => {
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yInflow}`).join(' ');
+  }, [points]);
+
+  const inflowAreaD = useMemo(() => {
+    return points.length > 0
+      ? `${inflowLineD} L ${points[points.length - 1].x} ${bottomY} L ${points[0].x} ${bottomY} Z`
+      : '';
+  }, [points, inflowLineD, bottomY]);
+
+  const outflowLineD = useMemo(() => {
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yOutflow}`).join(' ');
+  }, [points]);
+
+  const outflowAreaD = useMemo(() => {
+    return points.length > 0
+      ? `${outflowLineD} L ${points[points.length - 1].x} ${bottomY} L ${points[0].x} ${bottomY} Z`
+      : '';
+  }, [points, outflowLineD, bottomY]);
+
+  const handleMouseMove = (e) => {
+    if (points.length === 0) return;
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const svgX = (mouseX / rect.width) * width;
+    
+    let closest = points[0];
+    let minDist = Math.abs(points[0].x - svgX);
+    points.forEach(p => {
+      const dist = Math.abs(p.x - svgX);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = p;
+      }
+    });
+    setHoveredPoint(closest);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredPoint(null);
+  };
+
   const TABS = [
+    ['summary', isRtl ? '📊 الملخص المالي' : '📊 Financial Summary'],
     ['sales', isRtl ? '🧾 المبيعات' : '🧾 Sales'],
     ['expenses', isRtl ? '💸 المصروفات' : '💸 Expenses'],
     ['inventory', isRtl ? '📦 المخزون' : '📦 Inventory'],
-    ['receivables', isRtl ? '👤 الذمم' : '👤 Receivables'],
+    ['receivables', isRtl ? '👤 ديون العملاء' : '👤 Customer Receivables'],
   ];
 
   return (
@@ -5662,6 +5827,342 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-6" style={{}}>
+        {view === 'summary' && (
+          <div className="space-y-6">
+            {/* 1. Executive Financial Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div>
+                  <span className="text-[18px] mb-2 block">📈</span>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    {isRtl ? 'إجمالي المبيعات' : 'Gross Sales'}
+                  </p>
+                </div>
+                <p className="text-2xl font-black text-[#0066FF]">{formatMoney(summaryData.grossRevenue)}</p>
+              </div>
+
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div>
+                  <span className="text-[18px] mb-2 block">🏷️</span>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    {isRtl ? 'تكلفة البضائع (COGS)' : 'Cost of Goods Sold'}
+                  </p>
+                </div>
+                <p className="text-2xl font-black text-orange-500">{formatMoney(summaryData.cogs)}</p>
+              </div>
+
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div>
+                  <span className="text-[18px] mb-2 block">💸</span>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    {isRtl ? 'إجمالي المصروفات' : 'Business Expenses'}
+                  </p>
+                </div>
+                <p className="text-2xl font-black text-rose-500">{formatMoney(summaryData.totalExpenses)}</p>
+              </div>
+
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div>
+                  <span className="text-[18px] mb-2 block">🤝</span>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    {isRtl ? 'مديونيات الموردين' : 'Supplier Liabilities'}
+                  </p>
+                </div>
+                <p className="text-2xl font-black text-amber-500">{formatMoney(summaryData.totalSupplierLiabilities)}</p>
+              </div>
+
+              <div className="border p-5 flex flex-col justify-between" style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: summaryData.netProfit >= 0 ? '#10b981' : '#ef4444',
+                borderWidth: '1.5px'
+              }}>
+                <div>
+                  <span className="text-[18px] mb-2 block">{summaryData.netProfit >= 0 ? '💰' : '⚠️'}</span>
+                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    {isRtl ? 'صافي الأرباح' : 'Net Profit'}
+                  </p>
+                </div>
+                <p className={`text-2xl font-black ${
+                  summaryData.netProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                }`}>
+                  {formatMoney(summaryData.netProfit)}
+                </p>
+              </div>
+            </div>
+
+            {/* 2. Middle Section: Chart + Customer Debts & Liquidity */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Cash Flow Timeline Chart */}
+              <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-black text-[var(--text-primary)] text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {isRtl ? 'خريطة التدفقات النقدية (الداخلة vs الخارجة)' : 'Cash Flow Timeline (Inflows vs Outflows)'}
+                    </h3>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {isRtl ? 'مبيعات المحل مقابل المصروفات ودفعات الموردين' : 'Sales compared to expenses and vendor payments'}
+                    </p>
+                  </div>
+                  {/* Legend */}
+                  <div className="flex gap-4 text-[10px] font-black uppercase">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-[#0066FF] inline-block" />
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>{isRtl ? 'تدفقات داخلة (المبيعات)' : 'Inflow (Sales)'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-rose-500 inline-block" />
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>{isRtl ? 'تدفقات خارجة (مصاريف + موردين)' : 'Outflow'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SVG Chart Wrapper */}
+                <div className="relative flex-1 min-h-[220px]">
+                  {dailyFlows.length === 0 ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted)] font-black text-xs uppercase" style={{ color: 'var(--text-muted)' }}>
+                      {isRtl ? 'لا توجد بيانات كافية للرسم البياني' : 'No data in range'}
+                    </div>
+                  ) : (
+                    <>
+                      <svg
+                        width="100%"
+                        height="200"
+                        viewBox="0 0 500 200"
+                        preserveAspectRatio="none"
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        className="overflow-visible"
+                      >
+                        <defs>
+                          <linearGradient id="inflowGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#0066FF" stopOpacity="0.25"/>
+                            <stop offset="100%" stopColor="#0066FF" stopOpacity="0.0"/>
+                          </linearGradient>
+                          <linearGradient id="outflowGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.25"/>
+                            <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0"/>
+                          </linearGradient>
+                        </defs>
+
+                        {/* Grid lines */}
+                        <line x1="45" y1="20" x2="490" y2="20" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="3 3" />
+                        <line x1="45" y1="95" x2="490" y2="95" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="3 3" />
+                        <line x1="45" y1="170" x2="490" y2="170" stroke="var(--border-color)" strokeWidth="1" />
+
+                        {/* Y-axis labels */}
+                        <text x="37" y="24" fill="var(--text-secondary)" fontSize="8" fontWeight="bold" textAnchor="end">{formatMoney(maxVal)}</text>
+                        <text x="37" y="99" fill="var(--text-secondary)" fontSize="8" fontWeight="bold" textAnchor="end">{formatMoney(maxVal / 2)}</text>
+                        <text x="37" y="174" fill="var(--text-secondary)" fontSize="8" fontWeight="bold" textAnchor="end">0</text>
+
+                        {/* Chart paths */}
+                        {points.length > 0 && (
+                          <>
+                            <path d={inflowAreaD} fill="url(#inflowGrad)" border="none" />
+                            <path d={outflowAreaD} fill="url(#outflowGrad)" border="none" />
+
+                            <path d={inflowLineD} fill="none" stroke="#0066FF" strokeWidth="2.5" />
+                            <path d={outflowLineD} fill="none" stroke="#f43f5e" strokeWidth="2.5" />
+
+                            {/* Data Point Circles */}
+                            {points.map((p, idx) => (
+                              <g key={idx}>
+                                <circle cx={p.x} cy={p.yInflow} r="3" fill="#0066FF" stroke="var(--bg-card)" strokeWidth="1" />
+                                <circle cx={p.x} cy={p.yOutflow} r="3" fill="#f43f5e" stroke="var(--bg-card)" strokeWidth="1" />
+                              </g>
+                            ))}
+                          </>
+                        )}
+
+                        {/* Hover vertical line and circles */}
+                        {hoveredPoint && (
+                          <>
+                            <line
+                              x1={hoveredPoint.x}
+                              y1="20"
+                              x2={hoveredPoint.x}
+                              y2="170"
+                              stroke="var(--text-secondary)"
+                              strokeWidth="1.5"
+                              strokeDasharray="4 4"
+                            />
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.yInflow}
+                              r="5"
+                              fill="#0066FF"
+                              stroke="#ffffff"
+                              strokeWidth="1.5"
+                            />
+                            <circle
+                              cx={hoveredPoint.x}
+                              cy={hoveredPoint.yOutflow}
+                              r="5"
+                              fill="#f43f5e"
+                              stroke="#ffffff"
+                              strokeWidth="1.5"
+                            />
+                          </>
+                        )}
+                      </svg>
+
+                      {/* Tooltip Overlay */}
+                      {hoveredPoint && (
+                        <div
+                          className="absolute z-10 p-3 bg-[var(--bg-card)] border border-[var(--border-color)] pointer-events-none text-xs font-bold space-y-1"
+                          dir={isRtl ? 'rtl' : 'ltr'}
+                          style={{
+                            left: `${(hoveredPoint.x - 45) / 445 * 80 + 10}%`,
+                            top: '15px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            backgroundColor: 'var(--bg-card)',
+                            borderColor: 'var(--border-color)'
+                          }}
+                        >
+                          <p className="text-[var(--text-primary)] border-b border-[var(--border-color)] pb-1 mb-1 font-black" style={{ color: 'var(--text-primary)', borderColor: 'var(--border-color)' }}>{hoveredPoint.day}</p>
+                          <div className="flex gap-4 justify-between">
+                            <span className="text-blue-500 font-black">{isRtl ? 'داخل (مبيعات):' : 'Inflow:'}</span>
+                            <span className="text-[var(--text-primary)]" style={{ color: 'var(--text-primary)' }}>{formatMoney(hoveredPoint.inflow)}</span>
+                          </div>
+                          <div className="flex gap-4 justify-between">
+                            <span className="text-rose-500 font-black">{isRtl ? 'خارج (مصاريف):' : 'Outflow:'}</span>
+                            <span className="text-[var(--text-primary)]" style={{ color: 'var(--text-primary)' }}>{formatMoney(hoveredPoint.outflow)}</span>
+                          </div>
+                          <div className="flex gap-4 justify-between border-t border-[var(--border-color)] pt-1 mt-1" style={{ borderColor: 'var(--border-color)' }}>
+                            <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>{isRtl ? 'الصافي اليومي:' : 'Net:'}</span>
+                            <span className={hoveredPoint.inflow - hoveredPoint.outflow >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
+                              {formatMoney(hoveredPoint.inflow - hoveredPoint.outflow)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* X Axis Labels */}
+                {points.length > 0 && (
+                  <div className="flex justify-between pl-[45px] pr-[10px] mt-2 text-[9px] font-black text-[var(--text-muted)]" dir="ltr" style={{ color: 'var(--text-muted)' }}>
+                    <span>{points[0].day}</span>
+                    {points.length > 2 && <span>{points[Math.floor(points.length / 2)].day}</span>}
+                    <span>{points[points.length - 1].day}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Liquidity Mapping & Customer Arrears */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+                <div>
+                  <h3 className="font-black text-[var(--text-primary)] text-sm mb-1" style={{ color: 'var(--text-primary)' }}>
+                    {isRtl ? 'سيولة المحل ومستحقات العملاء' : 'Liquidity & Receivables Mapping'}
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-muted)] mb-5" style={{ color: 'var(--text-muted)' }}>
+                    {isRtl ? 'توزيع قنوات الدفع مقابل مديونيات العملاء الآجل' : 'Payment breakdown vs outstanding client arrears'}
+                  </p>
+                </div>
+
+                <div className="space-y-4 flex-1 flex flex-col justify-center">
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>💵 {isRtl ? 'السيولة النقدية' : 'Cash Liquidity'}</span>
+                      <span className="text-[var(--text-primary)] font-black" style={{ color: 'var(--text-primary)' }}>{formatMoney(salesData.cash)}</span>
+                    </div>
+                    <div className="w-full bg-[var(--bg-deep)] h-2" style={{ backgroundColor: 'var(--bg-deep)' }}>
+                      <div className="bg-[#0066FF] h-2" style={{ width: `${salesData.total > 0 ? (salesData.cash / salesData.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>💳 {isRtl ? 'سيولة الشبكة/البطاقة' : 'Card Liquidity'}</span>
+                      <span className="text-[var(--text-primary)] font-black" style={{ color: 'var(--text-primary)' }}>{formatMoney(salesData.card)}</span>
+                    </div>
+                    <div className="w-full bg-[var(--bg-deep)] h-2" style={{ backgroundColor: 'var(--bg-deep)' }}>
+                      <div className="bg-purple-500 h-2" style={{ width: `${salesData.total > 0 ? (salesData.card / salesData.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>⏱️ {isRtl ? 'المبيعات الآجلة (الفترة)' : 'Credit Sales (Range)'}</span>
+                      <span className="text-[var(--text-primary)] font-black" style={{ color: 'var(--text-primary)' }}>{formatMoney(salesData.credit)}</span>
+                    </div>
+                    <div className="w-full bg-[var(--bg-deep)] h-2" style={{ backgroundColor: 'var(--bg-deep)' }}>
+                      <div className="bg-amber-500 h-2" style={{ width: `${salesData.total > 0 ? (salesData.credit / salesData.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[var(--border-color)] pt-4 mt-2" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-[var(--text-secondary)]" style={{ color: 'var(--text-secondary)' }}>👤 {isRtl ? 'إجمالي ديون العملاء (الذمم)' : 'Total Client Arrears'}</span>
+                      <span className="text-rose-500 font-black">{formatMoney(receivablesData.reduce((s, c) => s + c.balance, 0))}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Supplier Accounts Ledger Table */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="p-5 border-b border-[var(--border-color)] flex justify-between items-center flex-wrap gap-2" style={{ borderColor: 'var(--border-color)' }}>
+                <div>
+                  <h3 className="font-black text-[var(--text-primary)] text-sm" style={{ color: 'var(--text-primary)' }}>
+                    {isRtl ? 'دفتر حسابات الموردين والذمم الدائنة' : 'Supplier Ledger & Accounts Payable'}
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {isRtl ? 'إجمالي المشتريات والمبالغ المسددة والالتزامات المتبقية للموردين' : 'Outstanding credits and payments per supplier'}
+                  </p>
+                </div>
+                <span className="text-[10px] font-black text-amber-500 px-3 py-1 border border-amber-500/20 bg-amber-500/5">
+                  {isRtl ? 'مجموع مديونيات الموردين:' : 'Total Vendor Debt:'} {formatMoney(summaryData.totalSupplierLiabilities)}
+                </span>
+              </div>
+
+              {supplierLedger.length === 0 ? (
+                <div className="h-32 flex flex-col items-center justify-center text-[var(--text-muted)] font-black uppercase text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <span>🤝 {isRtl ? 'لا توجد حسابات موردين حالياً' : 'No supplier accounts found'}</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[var(--border-color)] bg-[var(--bg-deep)] text-start text-[9px] font-black uppercase text-[var(--text-muted)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-deep)' }}>
+                        <th className="px-4 py-3 text-start" style={{ color: 'var(--text-muted)' }}>{isRtl ? 'المورد' : 'Supplier Name'}</th>
+                        <th className="px-4 py-3 text-start" style={{ color: 'var(--text-muted)' }}>{isRtl ? 'إجمالي التوريد' : 'Total Orders Value'}</th>
+                        <th className="px-4 py-3 text-start" style={{ color: 'var(--text-muted)' }}>{isRtl ? 'المدفوع' : 'Paid Amount'}</th>
+                        <th className="px-4 py-3 text-start" style={{ color: 'var(--text-muted)' }}>{isRtl ? 'الدين المتبقي' : 'Remaining Balance/Debt'}</th>
+                        <th className="px-4 py-3 text-start" style={{ color: 'var(--text-muted)' }}>{isRtl ? 'حالة الدفع' : 'Payment Status'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {supplierLedger.sort((a, b) => b.remainingDebt - a.remainingDebt).map(sup => (
+                        <tr key={sup.name} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-deep)]" style={{ borderColor: 'var(--border-color)' }}>
+                          <td className="px-4 py-3 font-bold text-[var(--text-primary)] text-sm text-start" style={{ color: 'var(--text-primary)' }}>{sup.name}</td>
+                          <td className="px-4 py-3 font-bold text-slate-700">{formatMoney(sup.totalPurchased)}</td>
+                          <td className="px-4 py-3 font-bold text-emerald-600">{formatMoney(sup.paid)}</td>
+                          <td className={`px-4 py-3 font-black ${sup.remainingDebt > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                            {formatMoney(sup.remainingDebt)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {sup.remainingDebt > 0 ? (
+                              <span className="inline-block text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5">
+                                {isRtl ? 'مستحق السداد' : 'Outstanding Debt'}
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5">
+                                {isRtl ? 'خالص' : 'Settled'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {view === 'sales' && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -7327,7 +7828,7 @@ export default function App() {
       case 'purchases': return <PurchasesScreen purchases={purchases} setPurchases={setPurchases} items={items} setItems={setItems} vouchers={vouchers} setVouchers={setVouchers} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'treasury': return <TreasuryScreen orders={orders} purchases={purchases} expenses={expenses} vouchers={vouchers} customerPayments={customerPayments} staffPayments={staffPayments} cashLog={cashLog} setCashLog={setCashLog} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} bankBalance={bankBalance} setBankBalance={setBankBalance} />;
       case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
-      case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} />;
+      case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} vouchers={vouchers} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
       case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
         ? <BranchManagement language={language} currentUser={currentUser} />
