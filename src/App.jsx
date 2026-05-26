@@ -7498,6 +7498,52 @@ export default function App() {
     };
   }, [branchId, cloudReady]);
 
+  // =========================================================================
+  // MULTI-BRANCH LOGIN: Supabase cross-branch auth with data reload
+  // =========================================================================
+  const reloadBranchData = useCallback(async (targetBranchId) => {
+    if (!targetBranchId) return;
+    try {
+      const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
+             cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
+             cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
+        SB.fetchUsers(targetBranchId),
+        SB.fetchCategories(targetBranchId),
+        SB.fetchItems(targetBranchId),
+        SB.fetchOrders(targetBranchId),
+        SB.fetchCustomers(targetBranchId),
+        SB.fetchExpenses(targetBranchId),
+        SB.fetchShifts(targetBranchId),
+        SB.fetchDrawerLogs(targetBranchId),
+        SB.fetchCustomerPayments(targetBranchId),
+        SB.fetchStaffPayments(targetBranchId),
+        SB.fetchUserPermissions(targetBranchId),
+        SB.fetchSettings(targetBranchId),
+      ]);
+      if (cloudUsers.length > 0) setUsers(cloudUsers);
+      if (cloudCategories.length > 0) setCategories(cloudCategories);
+      if (cloudItems.length > 0) setItems(cloudItems);
+      if (cloudOrders.length > 0) setOrders(cloudOrders); else setOrders([]);
+      if (cloudCustomers.length > 0) setCustomers(cloudCustomers); else setCustomers([]);
+      if (cloudExpenses.length > 0) setExpenses(cloudExpenses); else setExpenses([]);
+      if (cloudShifts.length > 0) setShifts(cloudShifts); else setShifts([]);
+      if (cloudDrawerLogs.length > 0) setDrawerLogs(cloudDrawerLogs); else setDrawerLogs([]);
+      if (cloudCustomerPayments.length > 0) setCustomerPayments(cloudCustomerPayments); else setCustomerPayments([]);
+      if (Object.keys(cloudStaffPayments).length > 0) setStaffPayments(cloudStaffPayments);
+      if (Object.keys(cloudUserPerms).length > 0) setUserPermissions(cloudUserPerms);
+      const openShift = cloudShifts.find(s => s.status === 'Open');
+      setActiveShift(openShift || null);
+      if (cloudSettings) {
+        if (cloudSettings.drawer_balance != null) setDrawerBalance(Number(cloudSettings.drawer_balance));
+        if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
+        if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
+      }
+      console.log('🔄 Branch data reloaded for:', targetBranchId);
+    } catch (err) {
+      console.error('Branch data reload failed:', err);
+    }
+  }, []);
+
   // -------------------------------------------------------------------------
   // BUG FIX: KEYBOARD INPUT FREEZING / KEYSTROKE TRAPPING BAILOUT
   // -------------------------------------------------------------------------
@@ -7600,52 +7646,6 @@ export default function App() {
     });
     return { ...item, stock };
   }), [items, orders]);
-
-  // =========================================================================
-  // MULTI-BRANCH LOGIN: Supabase cross-branch auth with data reload
-  // =========================================================================
-  const reloadBranchData = useCallback(async (targetBranchId) => {
-    if (!targetBranchId) return;
-    try {
-      const [cloudUsers, cloudCategories, cloudItems, cloudOrders, cloudCustomers,
-             cloudExpenses, cloudShifts, cloudDrawerLogs, cloudCustomerPayments,
-             cloudStaffPayments, cloudUserPerms, cloudSettings] = await Promise.all([
-        SB.fetchUsers(targetBranchId),
-        SB.fetchCategories(targetBranchId),
-        SB.fetchItems(targetBranchId),
-        SB.fetchOrders(targetBranchId),
-        SB.fetchCustomers(targetBranchId),
-        SB.fetchExpenses(targetBranchId),
-        SB.fetchShifts(targetBranchId),
-        SB.fetchDrawerLogs(targetBranchId),
-        SB.fetchCustomerPayments(targetBranchId),
-        SB.fetchStaffPayments(targetBranchId),
-        SB.fetchUserPermissions(targetBranchId),
-        SB.fetchSettings(targetBranchId),
-      ]);
-      if (cloudUsers.length > 0) setUsers(cloudUsers);
-      if (cloudCategories.length > 0) setCategories(cloudCategories);
-      if (cloudItems.length > 0) setItems(cloudItems);
-      if (cloudOrders.length > 0) setOrders(cloudOrders); else setOrders([]);
-      if (cloudCustomers.length > 0) setCustomers(cloudCustomers); else setCustomers([]);
-      if (cloudExpenses.length > 0) setExpenses(cloudExpenses); else setExpenses([]);
-      if (cloudShifts.length > 0) setShifts(cloudShifts); else setShifts([]);
-      if (cloudDrawerLogs.length > 0) setDrawerLogs(cloudDrawerLogs); else setDrawerLogs([]);
-      if (cloudCustomerPayments.length > 0) setCustomerPayments(cloudCustomerPayments); else setCustomerPayments([]);
-      if (Object.keys(cloudStaffPayments).length > 0) setStaffPayments(cloudStaffPayments);
-      if (Object.keys(cloudUserPerms).length > 0) setUserPermissions(cloudUserPerms);
-      const openShift = cloudShifts.find(s => s.status === 'Open');
-      setActiveShift(openShift || null);
-      if (cloudSettings) {
-        if (cloudSettings.drawer_balance != null) setDrawerBalance(Number(cloudSettings.drawer_balance));
-        if (cloudSettings.main_safe_balance != null) setMainSafeBalance(Number(cloudSettings.main_safe_balance));
-        if (cloudSettings.bank_balance != null) setBankBalance(Number(cloudSettings.bank_balance));
-      }
-      console.log('🔄 Branch data reloaded for:', targetBranchId);
-    } catch (err) {
-      console.error('Branch data reload failed:', err);
-    }
-  }, []);
 
   const handleSignUp = async (name, username, password, signUpStoreName, inviteCtx) => {
     try {
