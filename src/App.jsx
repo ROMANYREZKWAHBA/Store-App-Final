@@ -11,6 +11,7 @@ import SubscriptionUpgrade from './SubscriptionUpgrade';
 import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
 import LandingPage from './LandingPage';
+import TableManagementScreen from './TableManagement';
 import { getCategories, getModifiers, getInitialItems, getDefaultUsers, getTranslations } from './utils/appDefaults';
 
 function formatMoney(amount) {
@@ -25,13 +26,12 @@ function getRoleName(roleIdOrName) {
   if (roleIdOrName === 'admin') return 'Admin';
 
   const defaultCustomRoles = [
-    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
-    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
-    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
+    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
+    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
+    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'tables', 'shifts', 'sales'] },
     { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
     { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
   ];
-
   let roles = [];
   try {
     roles = JSON.parse(localStorage.getItem('pos_custom_roles')) || [];
@@ -48,9 +48,9 @@ function isManagerOrAbove(user, customRolesList) {
   if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
 
   const defaultCustomRoles = [
-    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
-    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
-    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
+    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
+    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
+    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'tables', 'shifts', 'sales'] },
     { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
     { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
   ];
@@ -84,9 +84,9 @@ function canAccess(user, tab, customPerms, customRolesList) {
   }
 
   const defaultCustomRoles = [
-    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
-    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
-    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'shifts', 'sales'] },
+    { id: 'role_admin', name: 'المدير العام / Admin', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'] },
+    { id: 'role_manager', name: 'مدير فرع / Manager', allowedTabs: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'] },
+    { id: 'role_cashier', name: 'كاشير / Cashier', allowedTabs: ['pos', 'tables', 'shifts', 'sales'] },
     { id: 'role_accountant', name: 'المحاسب / Accountant', allowedTabs: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'] },
     { id: 'role_storekeeper', name: 'أمين المستودع / Storekeeper', allowedTabs: ['inventory', 'purchases', 'reports', 'transfers'] },
   ];
@@ -94,9 +94,9 @@ function canAccess(user, tab, customPerms, customRolesList) {
   const rolePermissions = {
     Owner: ['all'],
     admin: ['all'],
-    Admin: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
-    Manager: ['dashboard', 'pos', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
-    Cashier: ['pos', 'shifts', 'sales'],
+    Admin: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers'],
+    Manager: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
+    Cashier: ['pos', 'tables', 'shifts', 'sales'],
     Accountant: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'],
     Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
   };
@@ -4074,6 +4074,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
       items: [
         { id: 'dashboard', label: t.dashboard, icon: '📊' },
         { id: 'pos', label: t.pos, icon: '🛒' },
+        { id: 'tables', label: t.tables || 'Tables', icon: '🪑' },
         { id: 'shifts', label: t.shifts, icon: '⏱️' },
         { id: 'drawer', label: isRtl ? 'درج الكاشير' : 'Cash Drawer', icon: '💵' },
       ]
@@ -6912,7 +6913,7 @@ export default function App() {
           setShowAuth(true);
         } else {
           const tab = path.substring(1);
-          const validTabs = ['dashboard', 'pos', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
+          const validTabs = ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
           if (validTabs.includes(tab)) {
             const cachedUser = localStorage.getItem('pos_current_user');
             if (cachedUser) {
@@ -6984,7 +6985,7 @@ export default function App() {
   // Helper to determine the initial dashboard tab on load/refresh
   const getInitialTab = () => {
     const path = window.location.pathname.substring(1);
-    const validTabs = ['dashboard', 'pos', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
+    const validTabs = ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
     if (validTabs.includes(path)) {
       return path;
     }
@@ -7131,6 +7132,14 @@ export default function App() {
   const [purchases, setPurchases] = useState(() => JSON.parse(localStorage.getItem('pos_purchases')) || []);
   const [vouchers, setVouchers] = useState(() => JSON.parse(localStorage.getItem('pos_vouchers')) || []);
   const [cashLog, setCashLog] = useState(() => JSON.parse(localStorage.getItem('pos_cashLog')) || []);
+
+  // Table Management & Reservations
+  const [tables, setTables] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pos_tables')) || []; } catch { return []; }
+  });
+  const [reservations, setReservations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pos_reservations')) || []; } catch { return []; }
+  });
 
   // =========================================================================
   // SUPABASE CLOUD BOOT: Load data from cloud on startup
@@ -7554,6 +7563,8 @@ export default function App() {
     localStorage.setItem('pos_drawerBalance', drawerBalance.toString());
     localStorage.setItem('pos_mainSafeBalance', mainSafeBalance.toString());
     localStorage.setItem('pos_bankBalance', bankBalance.toString());
+    localStorage.setItem('pos_tables', JSON.stringify(tables));
+    localStorage.setItem('pos_reservations', JSON.stringify(reservations));
 
     // Sync to Supabase cloud if branch is ready
     if (branchId && cloudReady) {
@@ -7572,7 +7583,7 @@ export default function App() {
       // Save balances to settings
       SB.saveSettings(branchId, { drawer_balance: drawerBalance, main_safe_balance: mainSafeBalance, bank_balance: bankBalance });
     }
-  }, [users, categories, items, orders, customers, expenses, customerPayments, activeShift, shifts, staffEmployees, staffPayments, drawerLogs, userPermissions, purchases, vouchers, cashLog, drawerBalance, mainSafeBalance, bankBalance, branchId, cloudReady]);
+  }, [users, categories, items, orders, customers, expenses, customerPayments, activeShift, shifts, staffEmployees, staffPayments, drawerLogs, userPermissions, purchases, vouchers, cashLog, drawerBalance, mainSafeBalance, bankBalance, tables, reservations, branchId, cloudReady]);
 
 
   const pushNotification = useCallback((message, type = 'info') => {
@@ -8269,6 +8280,7 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard': return <DashboardTab items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
       case 'pos': return <POSScreen currentUser={currentUser} items={saleableItems} customers={customers} categories={categories} onCompleteOrder={handleCompleteOrder} language={language} activeShift={activeShift} onAddCustomer={handleAddCustomer} onGoToShifts={() => handleSetActiveTab('shifts')} taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} currency={currency} storeName={storeName} setDrawerBalance={setDrawerBalance} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} users={users} />;
+      case 'tables': return <TableManagementScreen language={language} orders={orders} currentUser={currentUser} pushNotification={pushNotification} />;
       case 'drawer': return <DrawerScreen activeShift={activeShift} drawerBalance={drawerBalance} setDrawerBalance={setDrawerBalance} setMainSafeBalance={setMainSafeBalance} drawerLogs={drawerLogs} setDrawerLogs={setDrawerLogs} currency={currency} isRtl={isRtl} setCashLog={setCashLog} currentUser={currentUser} />;
       case 'shifts': return <ShiftScreen activeShift={activeShift} shifts={shifts} onOpenShift={handleOpenShift} onCloseShift={handleCloseShift} currentUser={currentUser} language={language} users={users} orders={orders} expenses={expenses} onLogout={handleLogout} storeName={storeName} currency={currency} drawerLogs={drawerLogs} />;
       case 'sales': return <SalesScreen orders={orders} users={users} customers={customers} language={language} onVoidOrder={handleVoidOrder} currency={currency} storeName={storeName} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} activeShift={activeShift} />;
