@@ -83,6 +83,9 @@ function canAccess(user, tab, customPerms, customRolesList) {
   if (tab === 'admin_panel') {
     return user.id === 'u_4';
   }
+  if (tab === 'reports') {
+    return user.role === 'Owner' || user.role === 'owner';
+  }
   if (user.role === 'Owner' || user.role === 'admin' || user.role === 'owner') return true;
   // If owner set custom permissions for this user, use those
   if (customPerms && customPerms[user.id]) {
@@ -319,8 +322,9 @@ function ModifierModal({ item, onClose, language, onAdd }) {
 // ============================================================
 // CART PANEL
 // ============================================================
-function CartPanel({ cart, setCart, customers, items, orderType, currentUser, onCompleteOrder, language, isLocked, activeShift, onAddCustomer, isCheckoutRequested, setIsCheckoutRequested, taxRate, enableServiceFee, serviceFee, setDrawerBalance }) {
+function CartPanel({ cart, setCart, customers, items, orderType, currentUser, onCompleteOrder, language, isLocked, activeShift, onAddCustomer, isCheckoutRequested, setIsCheckoutRequested, taxRate, enableServiceFee, serviceFee, setDrawerBalance, employees }) {
   const [discount, setDiscount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [amountInput, setAmountInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -329,6 +333,20 @@ function CartPanel({ cart, setCart, customers, items, orderType, currentUser, on
   const [newCustPhone, setNewCustPhone] = useState('');
   const t = getTranslations()[language];
   const isRtl = language === 'ar';
+
+  const getDiscountLimit = () => {
+    if (currentUser?.role === 'Owner' || currentUser?.role === 'owner' || currentUser?.id === 'u_4') {
+      return 100;
+    }
+    const activeEmp = employees?.find(e => e.userId === currentUser?.id);
+    if (activeEmp && activeEmp.maxDiscount !== undefined && activeEmp.maxDiscount !== '') {
+      return Number(activeEmp.maxDiscount);
+    }
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Admin') {
+      return 20;
+    }
+    return 5;
+  };
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.priceAtOrder * i.quantity, 0), [cart]);
   const taxable = Math.max(0, subtotal - discount);
@@ -376,6 +394,8 @@ function CartPanel({ cart, setCart, customers, items, orderType, currentUser, on
     setIsAddingNew(false);
     setNewCustName('');
     setNewCustPhone('');
+    setDiscount(0);
+    setDiscountPercent(0);
   };
 
   const handleFinalize = () => {
@@ -499,6 +519,36 @@ function CartPanel({ cart, setCart, customers, items, orderType, currentUser, on
               </div>
             )}
 
+            <div className="bg-[var(--bg-card)]/5 p-4 rounded-none border border-white/10 space-y-2 text-right">
+              <label className="text-[10px] font-black text-[var(--text-muted)] uppercase block mb-1 text-right">
+                {isRtl ? `الخصم مسموح به حتى (${getDiscountLimit()}%)` : `Discount allowed up to (${getDiscountLimit()}%)`}
+              </label>
+              <div className="flex items-center bg-[var(--bg-card)]/10 border border-white/10 rounded-none px-3 py-1">
+                <span className="text-zinc-500 font-bold text-sm">%</span>
+                <input 
+                  type="number" 
+                  value={discountPercent || ''} 
+                  onChange={e => {
+                    const val = parseFloat(e.target.value) || 0;
+                    const limit = getDiscountLimit();
+                    if (val > limit) {
+                      alert(isRtl 
+                        ? `الحد الأقصى للخصم المسموح لك هو ${limit}%` 
+                        : `Your maximum allowed discount limit is ${limit}%`
+                      );
+                      return;
+                    }
+                    setDiscountPercent(val);
+                    setDiscount(subtotal * (val / 100));
+                  }} 
+                  className="w-full bg-transparent text-lg font-black text-center text-rose-400 outline-none border-none py-1"
+                  placeholder="0" 
+                  min="0"
+                  max="100"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="text-[10px] font-black text-[var(--text-muted)] uppercase block mb-2">{isRtl ? 'المبلغ المستلم' : 'Amount Received'}</label>
               <input type="number" value={amountInput} onChange={e => setAmountInput(e.target.value)} disabled={paymentMethod === 'Credit'}
@@ -534,7 +584,7 @@ function CartPanel({ cart, setCart, customers, items, orderType, currentUser, on
 // ============================================================
 // POS SCREEN
 // ============================================================
-function POSScreen({ currentUser, items, customers, categories, onCompleteOrder, language, activeShift, onAddCustomer, onGoToShifts, taxRate, enableServiceFee, serviceFee, currency, storeName, setDrawerBalance, invoiceLogo, invoiceHeader, invoiceFooter, users }) {
+function POSScreen({ currentUser, items, customers, categories, onCompleteOrder, language, activeShift, onAddCustomer, onGoToShifts, taxRate, enableServiceFee, serviceFee, currency, storeName, setDrawerBalance, invoiceLogo, invoiceHeader, invoiceFooter, users, employees }) {
   const [selectedCat, setSelectedCat] = useState('');
   const [cart, setCart] = useState([]);
   const [modifyingItem, setModifyingItem] = useState(null);
@@ -759,7 +809,8 @@ function POSScreen({ currentUser, items, customers, categories, onCompleteOrder,
           currentUser={currentUser} onCompleteOrder={handleComplete} language={language}
           isLocked={!activeShift} activeShift={activeShift} onAddCustomer={onAddCustomer}
           isCheckoutRequested={isCheckoutRequested} setIsCheckoutRequested={setIsCheckoutRequested} 
-          taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} setDrawerBalance={setDrawerBalance} />
+          taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} setDrawerBalance={setDrawerBalance}
+          employees={employees} />
       </aside>
 
       {modifyingItem && (
@@ -4219,6 +4270,9 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         {groups.map(group => {
           const activeCustomRole = customRoles?.find(r => r.id === user?.role || r.name === user?.role);
           const visibleItems = group.items.filter(tab => {
+            if (tab.id === 'reports') {
+              return user?.role === 'Owner' || user?.role === 'owner';
+            }
             return (user?.role === 'Owner' || user?.role === 'admin' || user?.role === 'owner') ||
                    (activeCustomRole && activeCustomRole.allowedTabs.includes(tab.id));
           });
@@ -4365,20 +4419,24 @@ function SubscriptionWarningBanner({ daysLeft, onRenew, language }) {
 // ============================================================
 // STAFF SCREEN - Full Implementation
 // ============================================================
-function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift, customRoles, invitations = [], setInvitations }) {
+function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift, customRoles, invitations = [], setInvitations, shifts }) {
   const isRtl = language === 'ar';
   const [view, setView] = useState('employees'); // 'employees' | 'users'
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [branchFilter, setBranchFilter] = useState('ALL');
   const [showForm, setShowForm] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
   const [showPaymentFor, setShowPaymentFor] = useState(null);
   const [showAttendanceFor, setShowAttendanceFor] = useState(null);
+  const [showShiftsHistoryFor, setShowShiftsHistoryFor] = useState(null);
 
   // Form fields
   const [fName, setFName] = useState('');
   const [fRole, setFRole] = useState(() => customRoles && customRoles.length > 0 ? customRoles[0].id : 'role_cashier');
   const [fSalary, setFSalary] = useState('');
+  const [fCommissionRate, setFCommissionRate] = useState('');
+  const [fMaxDiscount, setFMaxDiscount] = useState('');
   const [fFrequency, setFFrequency] = useState('MONTHLY');
   const [fUsername, setFUsername] = useState('');
   const [fPassword, setFPassword] = useState('');
@@ -4415,15 +4473,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     };
     setInvitations(prev => [...prev, newInvite]);
 
-    const params = new URLSearchParams({
-      inviteToken: 'true',
-      inviteId: inviteId,
-      storeId: activeBranchIdForInvite,
-      role: fRole,
-      storeName: activeStoreName,
-      name: fName.trim()
-    });
-    const link = `${window.location.origin}/join-branch?${params.toString()}`;
+    const link = `${window.location.origin}/join-branch?inviteId=${inviteId}&branchId=${activeBranchIdForInvite}&name=${encodeURIComponent(fName.trim())}`;
     setGeneratedInviteLink(link);
     setInviteLinkCopied(false);
   };
@@ -4451,7 +4501,8 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
   const filtered = employees.filter(e => {
     const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
     const matchRole = roleFilter === 'ALL' || e.role === roleFilter || e.roleId === roleFilter;
-    return matchSearch && matchRole && !e.deletedAt;
+    const matchBranch = branchFilter === 'ALL' || e.assignedBranchId === branchFilter || e.branchId === branchFilter;
+    return matchSearch && matchRole && matchBranch && !e.deletedAt;
   });
 
   // Load branches when modal opens
@@ -4462,9 +4513,16 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     setBranchesLoading(false);
   };
 
+  useEffect(() => {
+    if (currentUser?.role === 'Owner' || currentUser?.role === 'owner') {
+      loadBranches();
+    }
+  }, [currentUser]);
+
   const openAdd = () => {
     setEditingEmp(null);
     setFName(''); setFRole(ROLES[0]?.id || 'role_cashier'); setFSalary(''); setFFrequency('MONTHLY'); setFUsername(''); setFPassword('');
+    setFCommissionRate(''); setFMaxDiscount('');
     const userBranch = currentUser?.assignedBranchId || currentUser?.branchId || '';
     setFBranchId(currentUser?.role === 'Owner' || currentUser?.role === 'admin' || currentUser?.role === 'owner' ? '' : userBranch);
     loadBranches();
@@ -4475,6 +4533,8 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     setEditingEmp(emp);
     setFName(emp.name); setFRole(emp.roleId || emp.role); setFSalary(emp.salaryBase.toString()); setFFrequency(emp.paymentFrequency || 'MONTHLY');
     setFUsername(emp.username || ''); setFPassword('');
+    setFCommissionRate(emp.commissionRate !== undefined ? emp.commissionRate.toString() : '');
+    setFMaxDiscount(emp.maxDiscount !== undefined ? emp.maxDiscount.toString() : '');
     const userBranch = currentUser?.assignedBranchId || currentUser?.branchId || '';
     setFBranchId(currentUser?.role === 'Owner' || currentUser?.role === 'admin' || currentUser?.role === 'owner' ? (emp.assignedBranchId || emp.branchId || '') : userBranch);
     loadBranches();
@@ -4495,7 +4555,21 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     const branchNameVal = branchList.find(b => b.id === branchIdVal)?.name || null;
 
     if (editingEmp) {
-      const updated = { ...editingEmp, name: fName.trim(), role: fRole, roleId: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal, ...(fPassword ? { pin: fPassword } : {}) };
+      const updated = { 
+        ...editingEmp, 
+        name: fName.trim(), 
+        role: fRole, 
+        roleId: fRole, 
+        salaryBase: parseFloat(fSalary), 
+        commissionRate: parseFloat(fCommissionRate) || 0,
+        maxDiscount: parseFloat(fMaxDiscount) || 0,
+        paymentFrequency: fFrequency, 
+        username: fUsername, 
+        assignedBranchId: branchIdVal, 
+        branchId: branchIdVal, 
+        assignedBranchName: branchNameVal, 
+        ...(fPassword ? { pin: fPassword } : {}) 
+      };
       setEmployees(prev => prev.map(e => e.id === editingEmp.id ? updated : e));
       // sync user
       if (editingEmp.userId) {
@@ -4507,7 +4581,26 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
       const empId = 'EMP-' + Date.now().toString(36).toUpperCase();
       const userId = 'USR-' + Date.now().toString(36).toUpperCase();
       const newUser = { id: userId, name: fName.trim(), username: fUsername, password: fPassword, pin: fPassword, role: fRole, roleId: fRole, isActive: true, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal };
-      const newEmp = { id: empId, userId, name: fName.trim(), role: fRole, roleId: fRole, salaryBase: parseFloat(fSalary), paymentFrequency: fFrequency, username: fUsername, pin: fPassword, assignedBranchId: branchIdVal, branchId: branchIdVal, assignedBranchName: branchNameVal, status: 'ACTIVE', shiftStatus: 'OFF_SHIFT', todaySales: 0, performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } };
+      const newEmp = { 
+        id: empId, 
+        userId, 
+        name: fName.trim(), 
+        role: fRole, 
+        roleId: fRole, 
+        salaryBase: parseFloat(fSalary), 
+        commissionRate: parseFloat(fCommissionRate) || 0,
+        maxDiscount: parseFloat(fMaxDiscount) || 0,
+        paymentFrequency: fFrequency, 
+        username: fUsername, 
+        pin: fPassword, 
+        assignedBranchId: branchIdVal, 
+        branchId: branchIdVal, 
+        assignedBranchName: branchNameVal, 
+        status: 'ACTIVE', 
+        shiftStatus: 'OFF_SHIFT', 
+        todaySales: 0, 
+        performance: { monthSales: 0, invoiceCount: 0, avgInvoice: 0, returns: 0, commission: 0, cashDiff: 0 } 
+      };
       setUsers(prev => [...prev, newUser]);
       setEmployees(prev => [...prev, newEmp]);
       pushNotification(isRtl ? 'تم إضافة الموظف' : 'Employee added', 'success');
@@ -4564,18 +4657,28 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
   const totalPaid = Object.entries(paymentsMap).filter(([k]) => !k.startsWith('ATT_')).reduce((s, [, pmts]) => s + pmts.filter(p => p.type === 'SALARY').reduce((a, p) => a + p.amount, 0), 0);
   const activeCount = employees.filter(e => e.status === 'ACTIVE' && !e.deletedAt).length;
 
+  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'owner';
+  const mainBranchStaffCount = employees.filter(e => !e.deletedAt && (e.assignedBranchName?.includes('الرئيسي') || e.assignedBranchName?.toLowerCase()?.includes('main'))).length;
+  const maadiBranchStaffCount = employees.filter(e => !e.deletedAt && (e.assignedBranchName?.includes('المعادي') || e.assignedBranchName?.toLowerCase()?.includes('maadi'))).length;
+
+  const statsCards = isOwner ? [
+    { label: isRtl ? 'إجمالي الموظفين بالسلسلة' : 'Total Chain Staff', value: employees.filter(e => !e.deletedAt).length, color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-card)]' },
+    { label: isRtl ? 'عدد موظفي الفرع الرئيسي' : 'Main Branch Staff', value: mainBranchStaffCount, color: 'text-[#2563eb]', bg: 'bg-blue-50/40' },
+    { label: isRtl ? 'عدد موظفي فرع المعادي' : 'Maadi Branch Staff', value: maadiBranchStaffCount, color: 'text-[#2563eb]', bg: 'bg-indigo-50/40' },
+  ] : [
+    { label: isRtl ? 'إجمالي الموظفين' : 'Total Staff', value: employees.filter(e => !e.deletedAt).length, color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-card)]' },
+    { label: isRtl ? 'نشطون' : 'Active', value: activeCount, color: 'text-[#0066FF]', bg: 'bg-emerald-50' },
+    { label: isRtl ? 'إجمالي الرواتب' : 'Total Salaries', value: formatMoney(totalSalaries), color: 'text-[#0066FF]', bg: 'bg-[#1a1a1a]' },
+    { label: isRtl ? 'مدفوع هذا الشهر' : 'Paid This Month', value: formatMoney(totalPaid), color: 'text-[#0066FF]', bg: 'bg-[var(--bg-card)]' },
+  ];
+
   const roleColors = { Owner: 'bg-amber-100 text-amber-700', Admin: 'bg-teal-100 text-[#0066FF]', Manager: 'bg-teal-100 text-[#0066FF]', Cashier: 'bg-emerald-100 text-[#0066FF]', Accountant: 'bg-blue-100 text-blue-700', Storekeeper: 'bg-orange-100 text-orange-700' };
 
   return (
     <div className="flex flex-col h-full" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header Stats */}
-      <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-        {[
-          { label: isRtl ? 'إجمالي الموظفين' : 'Total Staff', value: employees.filter(e => !e.deletedAt).length, color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-card)]' },
-          { label: isRtl ? 'نشطون' : 'Active', value: activeCount, color: 'text-[#0066FF]', bg: 'bg-emerald-50' },
-          { label: isRtl ? 'إجمالي الرواتب' : 'Total Salaries', value: formatMoney(totalSalaries), color: 'text-[#0066FF]', bg: 'bg-[#1a1a1a]' },
-          { label: isRtl ? 'مدفوع هذا الشهر' : 'Paid This Month', value: formatMoney(totalPaid), color: 'text-[#0066FF]', bg: 'bg-[var(--bg-card)]' },
-        ].map(s => (
+      <div className={`p-6 grid grid-cols-2 ${isOwner ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4 shrink-0`}>
+        {statsCards.map(s => (
           <div key={s.label} className={`${s.bg} border border-[var(--border-color)] p-5 rounded-none shadow-none`}>
             <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1">{s.label}</p>
             <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
@@ -4600,6 +4703,15 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                 className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none px-10 py-3 text-sm font-bold outline-none" />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">🔍</span>
             </div>
+            {(currentUser.role === 'Owner' || currentUser.role === 'owner') && (
+              <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none px-4 py-3 text-sm font-bold outline-none text-[#0066FF] font-black">
+                <option value="ALL">{isRtl ? 'جميع الفروع (الكل)' : 'All Branches (ALL)'}</option>
+                {branchList.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            )}
             <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
               className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-none px-4 py-3 text-sm font-bold outline-none">
               <option value="ALL">{isRtl ? 'كل الأدوار' : 'All Roles'}</option>
@@ -4633,6 +4745,20 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                         <div>
                           <p className={`font-black text-base ${emp.status === 'SUSPENDED' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>{emp.name}</p>
                           <span className={`text-[9px] font-black px-2 py-0.5 rounded-none ${roleColors[emp.role] || roleColors[getRoleName(emp.role)] || 'bg-[var(--bg-deep)] text-[var(--text-muted)]'}`}>{getRoleName(emp.role)}</span>
+                          {/* Pulsing Shift Status Dot */}
+                          <div className="inline-flex items-center gap-1.5 ml-2 mr-2">
+                            {shifts?.some(s => s.status === 'Open' && s.userId === emp.userId) ? (
+                              <span className="flex h-2 w-2 relative" title={isRtl ? 'في الوردية' : 'On Shift'}>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                            ) : (
+                              <span className="h-2 w-2 rounded-full bg-slate-300 inline-block" title={isRtl ? 'خارج الوردية' : 'Off Shift'}></span>
+                            )}
+                            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">
+                              {shifts?.some(s => s.status === 'Open' && s.userId === emp.userId) ? (isRtl ? 'في الوردية' : 'On Shift') : (isRtl ? 'مغلق' : 'Closed')}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
@@ -4645,20 +4771,40 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
 
                     {/* Salary Info */}
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-[var(--bg-deep)] rounded-none p-3">
+                      <div className="bg-[var(--bg-deep)] rounded-none p-3 text-right">
                         <p className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'الراتب' : 'Salary'}</p>
                         <p className="font-black text-slate-700 text-sm">{formatMoney(emp.salaryBase)}</p>
                         <p className="text-[8px] text-[var(--text-muted)]">{emp.paymentFrequency === 'MONTHLY' ? (isRtl ? 'شهري' : 'Monthly') : emp.paymentFrequency === 'WEEKLY' ? (isRtl ? 'أسبوعي' : 'Weekly') : (isRtl ? 'يومي' : 'Daily')}</p>
                       </div>
-                      <div className="bg-emerald-50 rounded-none p-3">
+                      <div className="bg-emerald-50 rounded-none p-3 text-right">
                         <p className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'مدفوع' : 'Paid'}</p>
                         <p className="font-black text-[#0066FF] text-sm">{formatMoney(totalPaidEmp)}</p>
                       </div>
-                      <div className={`rounded-none p-3 ${remaining > 0 ? 'bg-amber-50' : 'bg-[var(--bg-deep)]'}`}>
+                      <div className={`rounded-none p-3 text-right ${remaining > 0 ? 'bg-amber-50' : 'bg-[var(--bg-deep)]'}`}>
                         <p className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1">{isRtl ? 'متبقي' : 'Remaining'}</p>
                         <p className={`font-black text-sm ${remaining > 0 ? 'text-amber-600' : 'text-[var(--text-muted)]'}`}>{formatMoney(remaining)}</p>
                       </div>
                     </div>
+
+                    {/* Financial & Operational fields */}
+                    <div className="grid grid-cols-2 gap-2 mt-2 text-right">
+                      <div className="bg-blue-50/40 border border-blue-100/50 p-2.5 rounded-none text-right">
+                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-0.5">{isRtl ? 'نسبة العمولات' : 'Commission Rate'}</p>
+                        <p className="font-black text-[#0066FF] text-xs">{emp.commissionRate || 0}%</p>
+                      </div>
+                      <div className="bg-indigo-50/40 border border-indigo-100/50 p-2.5 rounded-none text-right">
+                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-0.5">{isRtl ? 'الحد الأقصى للخصم' : 'Discount Limit'}</p>
+                        <p className="font-black text-[#0066FF] text-xs">{emp.maxDiscount || 0}%</p>
+                      </div>
+                    </div>
+
+                    {emp.role === 'Cashier' && (
+                      <button 
+                        onClick={() => setShowShiftsHistoryFor(emp)}
+                        className="w-full mt-2 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-black text-[9px] uppercase tracking-widest transition-all">
+                        📊 {isRtl ? 'سجل ورديات الكاشير' : 'Cashier Shift Logs'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Payment History mini */}
@@ -4738,15 +4884,7 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                     </thead>
                     <tbody className="divide-y divide-[var(--border-color)]">
                       {pendingInvites.map(inv => {
-                        const params = new URLSearchParams({
-                          inviteToken: 'true',
-                          inviteId: inv.id,
-                          storeId: inv.branchId,
-                          role: inv.role,
-                          storeName: inv.branchName,
-                          name: inv.name
-                        });
-                        const inviteUrl = `${window.location.origin}/join-branch?${params.toString()}`;
+                        const inviteUrl = `${window.location.origin}/join-branch?inviteId=${inv.id}&branchId=${inv.branchId}&name=${encodeURIComponent(inv.name)}`;
 
                         return (
                           <tr key={inv.id} className="hover:bg-[var(--bg-deep)] transition-colors">
@@ -4870,6 +5008,8 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
                 [isRtl ? 'اسم المستخدم' : 'Username', fUsername, setFUsername, 'text', 'ahmed123'],
                 [isRtl ? 'كلمة السر / PIN' : 'Password / PIN', fPassword, setFPassword, 'password', '••••'],
                 [isRtl ? 'الراتب الأساسي' : 'Base Salary', fSalary, setFSalary, 'number', '0.00'],
+                [isRtl ? 'نسبة العمولات (%)' : 'Commission Rate (%)', fCommissionRate, setFCommissionRate, 'number', '0'],
+                [isRtl ? 'الحد الأقصى للخصم (%)' : 'Max Discount Limit (%)', fMaxDiscount, setFMaxDiscount, 'number', '5'],
               ].map(([label, val, setter, type, ph]) => (
                 <div key={label}>
                   <label className="text-[10px] font-black text-[var(--text-muted)] uppercase block mb-1.5">{label}</label>
@@ -5109,6 +5249,70 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
           </div>
         </div>
       )}
+
+      {showShiftsHistoryFor && (() => {
+        const emp = showShiftsHistoryFor;
+        const cashierShifts = (shifts || []).filter(s => s.userId === emp.userId && s.status === 'Closed');
+        const lastThreeClosed = [...cashierShifts]
+          .sort((a, b) => new Date(b.closedAt || 0) - new Date(a.openedAt || 0))
+          .slice(0, 3);
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowShiftsHistoryFor(null)}>
+            <div className="bg-[var(--bg-card)] rounded-none p-6 max-w-md w-full shadow-none text-right animate-fade-in" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <div className="text-right">
+                  <h3 className="text-base font-black text-[var(--text-primary)] uppercase">
+                    {isRtl ? `سجل ورديات: ${emp.name}` : `Shift Logs: ${emp.name}`}
+                  </h3>
+                  <p className="text-[9px] text-[var(--text-muted)] font-black uppercase">
+                    {isRtl ? 'آخر 3 ورديات مغلقة وتفاصيل الفروقات المالية' : 'Last 3 closed shifts & drawer discrepancies'}
+                  </p>
+                </div>
+                <button onClick={() => setShowShiftsHistoryFor(null)} className="w-8 h-8 rounded-none bg-[var(--bg-deep)] flex items-center justify-center hover:bg-slate-200 transition-colors">✕</button>
+              </div>
+
+              <div className="space-y-4 text-right">
+                {lastThreeClosed.length === 0 ? (
+                  <div className="py-8 text-center text-[var(--text-muted)]">
+                    <span className="text-3xl">📭</span>
+                    <p className="text-xs font-black uppercase mt-2">{isRtl ? 'لا توجد ورديات مغلقة مسجلة' : 'No closed shifts found'}</p>
+                  </div>
+                ) : (
+                  lastThreeClosed.map((s, idx) => {
+                    const variance = s.cashVariance !== undefined ? s.cashVariance : (s.cash_variance || 0);
+                    const dateStr = s.closedAt ? new Date(s.closedAt).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                    return (
+                      <div key={s.id || idx} className="p-4 bg-[var(--bg-deep)] border border-[var(--border-color)] rounded-none space-y-2 text-right">
+                        <div className="flex justify-between items-center text-[10px] font-black text-[var(--text-muted)]">
+                          <span>📅 {dateStr}</span>
+                          <span className="bg-slate-200 text-slate-800 px-2 py-0.5 rounded-none font-mono">ID: {s.id?.slice(-6) || '—'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs" dir={isRtl ? 'rtl' : 'ltr'}>
+                          <div className="bg-[var(--bg-card)] p-2">
+                            <span className="block text-[8px] text-[var(--text-muted)] font-black uppercase mb-1">{isRtl ? 'الرصيد المتوقع' : 'Expected'}</span>
+                            <span className="font-bold text-slate-700">{formatMoney(s.expectedCash || s.expected_cash || 0)}</span>
+                          </div>
+                          <div className="bg-[var(--bg-card)] p-2">
+                            <span className="block text-[8px] text-[var(--text-muted)] font-black uppercase mb-1">{isRtl ? 'الرصيد الفعلي' : 'Actual'}</span>
+                            <span className="font-bold text-slate-700">{formatMoney(s.actualCash || s.actual_cash || 0)}</span>
+                          </div>
+                          <div className={`p-2 ${variance === 0 ? 'bg-emerald-50/50' : variance > 0 ? 'bg-blue-50/50' : 'bg-rose-50/50'}`}>
+                            <span className="block text-[8px] text-[var(--text-muted)] font-black uppercase mb-1">{isRtl ? 'الفارق' : 'Variance'}</span>
+                            <span className={`font-black ${variance === 0 ? 'text-emerald-600' : variance > 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                              {variance > 0 ? '+' : ''}{variance.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -5823,12 +6027,148 @@ function TreasuryScreen({ orders, purchases, expenses, vouchers, customerPayment
 // ============================================================
 // REPORTS SCREEN
 // ============================================================
-function ReportsScreen({ orders, purchases, expenses, items, customers, customerPayments, language, vouchers = [] }) {
+function ReportsScreen({ orders, purchases, expenses, items, customers, customerPayments, language, vouchers = [], shifts = [], users = [], currentUser, branchId, activeBranchName }) {
   const isRtl = language === 'ar';
-  const [view, setView] = useState('summary');
+  const [view, setView] = useState('branch_analytics');
   const [startDate, setStartDate] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  const inRange = (ts) => { 
+    if (!ts) return false;
+    try {
+      const d = (ts instanceof Date ? ts : new Date(ts)).toISOString().split('T')[0]; 
+      return d >= startDate && d <= endDate; 
+    } catch(e) {
+      return false;
+    }
+  };
+
+  // Supabase state telemetry for multi-branch analytics
+  const [branches, setBranches] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
+  const [allShifts, setAllShifts] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [isLoadingCrossBranch, setIsLoadingCrossBranch] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (view === 'branch_analytics') {
+      const fetchCrossBranchData = async () => {
+        setIsLoadingCrossBranch(true);
+        try {
+          const { data: bData, error: bErr } = await supabase.from('branches').select('id, name, is_active, last_seen_time');
+          const { data: oData, error: oErr } = await supabase.from('orders').select('id, branch_id, timestamp, user_id, total, status');
+          const { data: sData, error: sErr } = await supabase.from('shifts').select('id, branch_id, user_id, opened_at, closed_at, opening_balance, expected_cash, actual_cash, cash_variance, status');
+          const { data: uData, error: uErr } = await supabase.from('users').select('id, branch_id, name, role, is_active');
+          
+          if (!active) return;
+
+          if (bErr) console.error("Error fetching branches:", bErr);
+          if (oErr) console.error("Error fetching orders:", oErr);
+          if (sErr) console.error("Error fetching shifts:", sErr);
+          if (uErr) console.error("Error fetching users:", uErr);
+
+          if (bData) setBranches(bData);
+          if (oData) setAllOrders(oData);
+          if (sData) setAllShifts(sData);
+          if (uData) setAllUsers(uData);
+        } catch (err) {
+          console.error("Failed to load cross-branch telemetry from Supabase:", err);
+        } finally {
+          if (active) setIsLoadingCrossBranch(false);
+        }
+      };
+      fetchCrossBranchData();
+    }
+    return () => {
+      active = false;
+    };
+  }, [view]);
+
+  const resolvedBranches = useMemo(() => {
+    if (branches && branches.length > 0) return branches;
+    return [{ id: branchId || 'main', name: activeBranchName || (isRtl ? 'الفرع الرئيسي' : 'Main Branch'), is_active: true }];
+  }, [branches, branchId, activeBranchName, isRtl]);
+
+  const resolvedOrders = useMemo(() => {
+    return (allOrders && allOrders.length > 0) ? allOrders : (orders || []);
+  }, [allOrders, orders]);
+
+  const resolvedShifts = useMemo(() => {
+    return (allShifts && allShifts.length > 0) ? allShifts : (shifts || []);
+  }, [allShifts, shifts]);
+
+  const resolvedUsers = useMemo(() => {
+    return (allUsers && allUsers.length > 0) ? allUsers : (users || []);
+  }, [allUsers, users]);
+
+  const activeOrders = useMemo(() => {
+    return resolvedOrders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && inRange(o.timestamp));
+  }, [resolvedOrders, startDate, endDate]);
+
+  const combinedRevenue = useMemo(() => {
+    return activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  }, [activeOrders]);
+
+  const branchComparisonData = useMemo(() => {
+    const list = resolvedBranches.map(b => {
+      const bOrders = activeOrders.filter(o => o.branch_id === b.id);
+      const revenue = bOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const isMain = b.name && (b.name.toLowerCase().includes('main') || b.name.includes('الرئيسي'));
+      const isMaadi = b.name && (b.name.toLowerCase().includes('maadi') || b.name.includes('المعادي'));
+      return {
+        ...b,
+        revenue,
+        isMain,
+        isMaadi
+      };
+    });
+    return list.sort((a, b) => b.revenue - a.revenue);
+  }, [resolvedBranches, activeOrders]);
+
+  const maxBranchRevenue = useMemo(() => {
+    const revs = branchComparisonData.map(b => b.revenue);
+    return Math.max(...revs, 1);
+  }, [branchComparisonData]);
+
+  const topCashiers = useMemo(() => {
+    const salesMap = {};
+    activeOrders.forEach(o => {
+      if (!o.user_id) return;
+      salesMap[o.user_id] = (salesMap[o.user_id] || 0) + Number(o.total || 0);
+    });
+    return Object.entries(salesMap)
+      .map(([userId, revenue]) => {
+        const userObj = resolvedUsers.find(u => u.id === userId);
+        const branchObj = resolvedBranches.find(b => b.id === userObj?.branch_id);
+        return {
+          userId,
+          name: userObj?.name || userId,
+          role: userObj?.role || 'Cashier',
+          branchName: branchObj?.name || (isRtl ? 'فرع غير معروف' : 'Unknown Branch'),
+          revenue
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [activeOrders, resolvedUsers, resolvedBranches, isRtl]);
+
+  const globalDiscrepancyLogs = useMemo(() => {
+    return resolvedShifts
+      .filter(s => s.closed_at && inRange(s.closed_at))
+      .map(s => {
+        const userObj = resolvedUsers.find(u => u.id === s.user_id);
+        const branchObj = resolvedBranches.find(b => b.id === s.branch_id);
+        return {
+          ...s,
+          userName: userObj?.name || s.user_id || (isRtl ? 'موظف غير معروف' : 'Unknown Staff'),
+          branchName: branchObj?.name || (isRtl ? 'فرع غير معروف' : 'Unknown Branch'),
+          variance: Number(s.cash_variance || 0)
+        };
+      })
+      .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at));
+  }, [resolvedShifts, resolvedUsers, resolvedBranches, startDate, endDate, isRtl]);
 
   const exportToPDF = async () => {
     const element = document.createElement('div');
@@ -5991,15 +6331,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
     }
   };
 
-  const inRange = (ts) => { 
-    if (!ts) return false;
-    try {
-      const d = (ts instanceof Date ? ts : new Date(ts)).toISOString().split('T')[0]; 
-      return d >= startDate && d <= endDate; 
-    } catch(e) {
-      return false;
-    }
-  };
+  // inRange moved to top of ReportsScreen
 
   const salesData = useMemo(() => {
     const filtered = orders.filter(o => o.status !== 'VOIDED' && o.status !== 'REFUNDED' && inRange(o.timestamp));
@@ -6204,6 +6536,7 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
   };
 
   const TABS = [
+    ['branch_analytics', isRtl ? '🌐 التحليلات المجمعة' : '🌐 Multi-Branch Analytics'],
     ['summary', isRtl ? '📊 الملخص المالي' : '📊 Financial Summary'],
     ['sales', isRtl ? '🧾 المبيعات' : '🧾 Sales'],
     ['expenses', isRtl ? '💸 المصروفات' : '💸 Expenses'],
@@ -6245,6 +6578,233 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-6" style={{}}>
+        {view === 'branch_analytics' && (
+          <div className="space-y-6">
+            {isLoadingCrossBranch && (
+              <div className="flex items-center gap-2 text-blue-600 font-bold justify-center bg-blue-50/50 dark:bg-blue-950/20 p-4 border border-blue-100 dark:border-blue-900/50">
+                <span className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-ping"></span>
+                <span className="text-xs uppercase tracking-widest">{isRtl ? 'جاري شحن وتحديث بيانات الفروع من السحابة...' : 'Synchronizing branch telemetry from Cloud...'}</span>
+              </div>
+            )}
+
+            {/* Metric Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Combined Revenue Card */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 luxury-card relative overflow-hidden">
+                <div className="absolute top-4 right-4 flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">{isRtl ? 'مباشر' : 'Live'}</span>
+                </div>
+                <div className="mb-4">
+                  <span className="text-2xl">🌐</span>
+                  <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider mt-2">
+                    {isRtl ? 'إجمالي مبيعات السلسلة' : 'Combined Chain Revenue'}
+                  </h3>
+                </div>
+                <p className="text-3xl font-black text-blue-600 dark:text-blue-400">
+                  {formatMoney(combinedRevenue)}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)] font-bold mt-2">
+                  {isRtl ? 'مجموع فروع السلسلة النشطة للفترة المحددة' : 'Gross revenue across active chain branches in range'}
+                </p>
+              </div>
+
+              {/* Active Branches Card */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 luxury-card">
+                <div className="mb-3">
+                  <span className="text-2xl">🏢</span>
+                  <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider mt-2">
+                    {isRtl ? 'الفروع المتصلة بالشبكة' : 'Connected Branches'}
+                  </h3>
+                </div>
+                <div className="space-y-2 mt-2 max-h-[80px] overflow-y-auto pr-1">
+                  {resolvedBranches.map(b => {
+                    const isMain = b.name && (b.name.toLowerCase().includes('main') || b.name.includes('الرئيسي'));
+                    const isMaadi = b.name && (b.name.toLowerCase().includes('maadi') || b.name.includes('المعادي'));
+                    return (
+                      <div key={b.id} className="flex justify-between items-center text-xs">
+                        <span className="font-bold flex items-center gap-2">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          {b.name}
+                          {isMain && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[8px] font-black rounded-none">الرئيسي</span>}
+                          {isMaadi && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[8px] font-black rounded-none">المعادي</span>}
+                        </span>
+                        <span className="text-[10px] text-[var(--text-muted)] font-black uppercase">
+                          {b.is_active !== false ? (isRtl ? 'متصل' : 'Connected') : (isRtl ? 'غير متصل' : 'Offline')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Total Closed Shifts Card */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 luxury-card">
+                <div className="mb-4">
+                  <span className="text-2xl">🔑</span>
+                  <h3 className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wider mt-2">
+                    {isRtl ? 'إجمالي الورديات المراقبة' : 'Monitored Shifts'}
+                  </h3>
+                </div>
+                <p className="text-3xl font-black text-amber-500">
+                  {globalDiscrepancyLogs.length}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)] font-bold mt-2">
+                  {isRtl ? 'عدد الورديات المغلقة التي تم ترحيلها وفحصها' : 'Total closed & audited cashier shifts in date range'}
+                </p>
+              </div>
+            </div>
+
+            {/* Section: Comparison and Scoreboard */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 1. Branch Comparison Progress Bars */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 luxury-card flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">
+                      {isRtl ? 'مقارنة حجم مبيعات الفروع' : 'Branch Sales Comparisons'}
+                    </h3>
+                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-none">{isRtl ? 'تحليل الأداء' : 'Performance Analysis'}</span>
+                  </div>
+                  <div className="space-y-4">
+                    {branchComparisonData.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)] font-bold py-6 text-center">{isRtl ? 'لا يوجد مبيعات للفروع في هذه الفترة' : 'No branch sales data recorded in this range'}</p>
+                    ) : (
+                      branchComparisonData.map(b => {
+                        const percentage = Math.round((b.revenue / maxBranchRevenue) * 100) || 0;
+                        return (
+                          <div key={b.id} className="space-y-1.5">
+                            <div className="flex justify-between items-center text-xs font-bold">
+                              <span className="flex items-center gap-1">
+                                {b.name}
+                                {b.isMain && <span className="text-[8px] bg-blue-600 text-white px-1 py-0.2 rounded-none font-black">{isRtl ? 'رئيسي' : 'Main'}</span>}
+                                {b.isMaadi && <span className="text-[8px] bg-amber-500 text-black px-1 py-0.2 rounded-none font-black">{isRtl ? 'معادي' : 'Maadi'}</span>}
+                              </span>
+                              <span>{formatMoney(b.revenue)} ({percentage}%)</span>
+                            </div>
+                            <div className="w-full bg-[var(--bg-deep)] h-2 rounded-none overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-500 ${b.isMain ? 'bg-blue-600' : b.isMaadi ? 'bg-amber-500' : 'bg-slate-400'}`} 
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Top-Performing Cashiers Scoreboard */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 luxury-card">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">
+                    {isRtl ? 'كاشير السلسلة المتصدر (لوحة التميز)' : 'Top Cashiers Scoreboard'}
+                  </h3>
+                  <span className="text-[10px] font-black text-amber-500 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-none">🏆 {isRtl ? 'الأعلى مبيعاً' : 'Best Sellers'}</span>
+                </div>
+                <div className="space-y-3">
+                  {topCashiers.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] font-bold py-6 text-center">{isRtl ? 'لا يوجد مبيعات مسجلة للموظفين حالياً' : 'No staff sales recorded in this range'}</p>
+                  ) : (
+                    topCashiers.map((cashier, idx) => (
+                      <div key={cashier.userId} className="flex justify-between items-center p-2.5 bg-[var(--bg-deep)] border-l-4 border-blue-600 text-xs font-bold">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-black rounded-none">
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <p className="text-[var(--text-primary)]">{cashier.name}</p>
+                            <p className="text-[9px] text-[var(--text-muted)] font-black uppercase mt-0.5">
+                              {cashier.branchName} • {getRoleName(cashier.role)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-blue-600 dark:text-blue-400 font-black">{formatMoney(cashier.revenue)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Table: Global Shift Discrepancy Logs */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] luxury-card">
+              <div className="p-6 border-b border-[var(--border-color)]">
+                <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">
+                  {isRtl ? 'سجل مطابقة فروقات النقدية بالسلسلة' : 'Global Shift Cash Variance Ledger'}
+                </h3>
+                <p className="text-[10px] text-[var(--text-secondary)] font-bold mt-1">
+                  {isRtl ? 'تقرير إداري مجمع للفروقات والعجز والزيادة بين الكاش الفعلي والمتوقع بالدرج للفروع' : 'Cross-branch consolidated shift audit log monitoring actual vs expected drawer balances'}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left" dir={isRtl ? 'rtl' : 'ltr'}>
+                  <thead className="bg-[var(--bg-deep)] uppercase text-[10px] text-[var(--text-secondary)] font-black">
+                    <tr>
+                      <th className="p-4 text-center">{isRtl ? 'المعرف' : 'ID'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'الفرع' : 'Branch'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'الكاشير' : 'Cashier'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'الرصيد الافتتاحي' : 'Opening Cash'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'الرصيد المتوقع بالدرج' : 'Expected Drawer'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'الرصيد الفعلي بالدرج' : 'Actual Cash'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'العجز / الزيادة' : 'Variance'}</th>
+                      <th className="p-4 text-center">{isRtl ? 'تاريخ إغلاق الوردية' : 'Closed Date'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalDiscrepancyLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-[var(--text-muted)] font-bold">
+                          {isRtl ? 'لا يوجد ورديات مغلقة خلال هذه الفترة' : 'No closed shifts found in the specified range'}
+                        </td>
+                      </tr>
+                    ) : (
+                      globalDiscrepancyLogs.map(s => {
+                        const isDiscrepant = Math.abs(s.variance) > 0.01;
+                        const isShortage = s.variance < -0.01;
+                        const isSurplus = s.variance > 0.01;
+                        
+                        return (
+                          <tr key={s.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-deep)] transition-colors">
+                            <td className="p-4 font-mono font-bold text-center text-[10px] text-[var(--text-muted)]">{s.id.slice(-6).toUpperCase()}</td>
+                            <td className="p-4 text-center font-bold">{s.branchName}</td>
+                            <td className="p-4 text-center font-bold">{s.userName}</td>
+                            <td className="p-4 text-center font-bold text-[var(--text-secondary)]">{formatMoney(s.opening_balance)}</td>
+                            <td className="p-4 text-center font-bold text-[var(--text-secondary)]">{formatMoney(s.expected_cash)}</td>
+                            <td className="p-4 text-center font-bold text-[var(--text-secondary)]">{formatMoney(s.actual_cash)}</td>
+                            <td className={`p-4 text-center font-black ${isShortage ? 'text-rose-600 dark:text-rose-400' : isSurplus ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-secondary)]'}`}>
+                              {isDiscrepant ? (
+                                <>
+                                  {s.variance > 0 ? '+' : ''}
+                                  {formatMoney(s.variance)}
+                                  <span className="text-[9px] block font-bold mt-0.5">
+                                    {isShortage ? (isRtl ? '(عجز بالصندوق)' : '(Drawer Shortage)') : (isRtl ? '(زيادة بالصندوق)' : '(Drawer Surplus)')}
+                                  </span>
+                                </>
+                              ) : (
+                                isRtl ? 'مطابق (0.00)' : 'Balanced (0.00)'
+                              )}
+                            </td>
+                            <td className="p-4 text-center font-bold text-[var(--text-muted)] text-[10px]">
+                              {new Date(s.closed_at).toLocaleString(isRtl ? 'ar-EG' : 'en-US')}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
         {view === 'summary' && (
           <div className="space-y-6">
             {/* 1. Executive Financial Summary Cards */}
@@ -6968,17 +7528,47 @@ export default function App() {
   const [inviteContext, setInviteContext] = useState(() => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('inviteToken');
-    const storeId = params.get('storeId');
-    const role = params.get('role');
-    const storeName = params.get('storeName');
-    const inviteId = params.get('inviteId');
-    const name = params.get('name');
+    const hasToken = params.get('inviteToken') === 'true';
+    const isJoinPath = path === '/join-branch';
 
-    if ((token === 'true' || path === '/join-branch') && storeId && role) {
-      const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
-      const decodedName = name ? decodeURIComponent(name) : '';
-      return { storeId, role, storeName: decodedStoreName, inviteId, name: decodedName };
+    if (hasToken || isJoinPath) {
+      const inviteId = params.get('inviteId');
+      const storeId = params.get('branchId') || params.get('storeId');
+      const name = params.get('name');
+      const role = params.get('role');
+      const storeName = params.get('storeName');
+
+      if (inviteId || storeId) {
+        let finalRole = role;
+        let finalStoreName = storeName;
+
+        if (inviteId) {
+          try {
+            const localInvites = JSON.parse(localStorage.getItem('pos_invitations')) || [];
+            const matched = localInvites.find(inv => inv.id === inviteId);
+            if (matched) {
+              if (!finalRole) finalRole = matched.role;
+              if (!finalStoreName) finalStoreName = matched.branchName;
+            }
+          } catch (e) {
+            console.error('Error reading local invitations:', e);
+          }
+        }
+
+        if (!finalRole) finalRole = 'role_cashier';
+        if (!finalStoreName) finalStoreName = localStorage.getItem('storeName') || 'StorePilot';
+
+        const decodedStoreName = finalStoreName ? decodeURIComponent(finalStoreName) : '';
+        const decodedName = name ? decodeURIComponent(name) : '';
+
+        return {
+          storeId: storeId || '',
+          role: finalRole,
+          storeName: decodedStoreName,
+          inviteId: inviteId || '',
+          name: decodedName
+        };
+      }
     }
     return null;
   });
@@ -6996,31 +7586,55 @@ export default function App() {
     const parseParams = () => {
       const path = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
-      const token = params.get('inviteToken');
-      const storeId = params.get('storeId');
-      const role = params.get('role');
-      const storeName = params.get('storeName');
-      const inviteId = params.get('inviteId');
-      const name = params.get('name');
+      const hasToken = params.get('inviteToken') === 'true';
+      const isJoinPath = path === '/join-branch';
 
-      if ((token === 'true' || path === '/join-branch') && storeId && role) {
-        const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
-        const decodedName = name ? decodeURIComponent(name) : '';
-        setInviteContext(prev => {
-          if (
-            prev &&
-            prev.storeId === storeId &&
-            prev.role === role &&
-            prev.storeName === decodedStoreName &&
-            prev.inviteId === inviteId &&
-            prev.name === decodedName
-          ) {
-            return prev;
+      if (hasToken || isJoinPath) {
+        const inviteId = params.get('inviteId');
+        const storeId = params.get('branchId') || params.get('storeId');
+        const name = params.get('name');
+        const role = params.get('role');
+        const storeName = params.get('storeName');
+
+        if (inviteId || storeId) {
+          let finalRole = role;
+          let finalStoreName = storeName;
+
+          if (inviteId) {
+            try {
+              const localInvites = JSON.parse(localStorage.getItem('pos_invitations')) || [];
+              const matched = localInvites.find(inv => inv.id === inviteId);
+              if (matched) {
+                if (!finalRole) finalRole = matched.role;
+                if (!finalStoreName) finalStoreName = matched.branchName;
+              }
+            } catch (e) {
+              console.error(e);
+            }
           }
-          return { storeId, role, storeName: decodedStoreName, inviteId, name: decodedName };
-        });
+
+          if (!finalRole) finalRole = 'role_cashier';
+          if (!finalStoreName) finalStoreName = localStorage.getItem('storeName') || 'StorePilot';
+
+          const decodedStoreName = finalStoreName ? decodeURIComponent(finalStoreName) : '';
+          const decodedName = name ? decodeURIComponent(name) : '';
+
+          setInviteContext(prev => {
+            if (
+              prev &&
+              prev.storeId === storeId &&
+              prev.role === finalRole &&
+              prev.storeName === decodedStoreName &&
+              prev.inviteId === inviteId &&
+              prev.name === decodedName
+            ) {
+              return prev;
+            }
+            return { storeId: storeId || '', role: finalRole, storeName: decodedStoreName, inviteId: inviteId || '', name: decodedName };
+          });
+        }
       } else {
-        if (window.location.search.indexOf('inviteToken') === -1 && path !== '/join-branch') {
+        if (path !== '/join-branch' && !window.location.search.includes('inviteId') && !window.location.search.includes('inviteToken')) {
           setInviteContext(prev => (prev !== null ? null : prev));
         }
       }
@@ -7063,11 +7677,15 @@ export default function App() {
           const hasDevOverride = localStorage.getItem('dev_override') === 'true';
           if (cachedUser) {
             const user = JSON.parse(cachedUser);
-            if (user.id === 'u_4' || user.role === 'admin' || user.role === 'Owner' || user.role === 'owner' || hasDevOverride) {
+            const loggedInAsOwner = user.role === 'Owner' || user.role === 'owner';
+            const allowed = !loggedInAsOwner && (user.id === 'u_4' || hasDevOverride);
+            if (allowed) {
               setCurrentUser(user);
               setShowAuth(false);
             } else {
-              window.history.replaceState({ screen: 'landing' }, '', '/');
+              // Stay on page and let renderAuthGateway throw 404
+              setCurrentUser(user);
+              setShowAuth(false);
             }
           } else if (hasDevOverride) {
             setShowAuth(false);
@@ -7081,6 +7699,9 @@ export default function App() {
           setCurrentUser(null);
           setShowAuth(false);
         } else if (path === '/login') {
+          setCurrentUser(null);
+          setShowAuth(true);
+        } else if (path === '/join-branch') {
           setCurrentUser(null);
           setShowAuth(true);
         } else if (path === '/admin-master-u4') {
@@ -7113,6 +7734,9 @@ export default function App() {
     if (path === '/admin-master-u4') {
       initialScreen = 'admin_panel_master';
       window.history.replaceState({ screen: 'admin_panel_master', tab: null }, '', path);
+    } else if (path === '/join-branch') {
+      initialScreen = 'auth';
+      window.history.replaceState({ screen: 'auth', tab: null }, '', path);
     } else if (cachedUser) {
       initialScreen = 'dashboard';
       const initialTabVal = getInitialTab();
@@ -8457,10 +9081,30 @@ export default function App() {
 
   const renderTabContent = () => {
     if (!currentUser) return null;
+
+    // Check if the current user is suspended/frozen
+    const currentEmployeeRecord = staffEmployees?.find(e => e.userId === currentUser.id);
+    const isFrozen = currentEmployeeRecord && currentEmployeeRecord.status === 'SUSPENDED';
+
+    if (isFrozen && (activeTab === 'pos' || activeTab === 'drawer')) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-6 p-10 bg-[var(--bg-deep)] text-[var(--text-primary)]" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/20 flex items-center justify-center rounded-2xl"><span className="text-4xl">❄️</span></div>
+          <h2 className="text-xl font-black text-rose-500 uppercase tracking-wider">{isRtl ? 'الحساب مجمد' : 'Account Frozen'}</h2>
+          <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest text-center max-w-md">
+            {isRtl ? 'تم تجميد حسابك بواسطة مالك المؤسسة. لا يمكنك الوصول لنقاط البيع أو الدرج.' : 'Your account has been frozen by the business Owner. Access to POS and Drawer is blocked.'}
+          </p>
+          <button onClick={handleLogout} className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest transition-all">
+            {isRtl ? 'تسجيل الخروج' : 'Logout'}
+          </button>
+        </div>
+      );
+    }
+
     const saleableItems = calculatedItems.filter(i => i.type === 'PRODUCT');
     switch (activeTab) {
       case 'dashboard': return <DashboardTab items={calculatedItems} orders={orders} customers={customers} expenses={expenses} purchases={purchases} customerPayments={customerPayments} cashboxLog={cashLog} activeShift={activeShift} users={users} language={language} />;
-      case 'pos': return <POSScreen currentUser={currentUser} items={saleableItems} customers={customers} categories={categories} onCompleteOrder={handleCompleteOrder} language={language} activeShift={activeShift} onAddCustomer={handleAddCustomer} onGoToShifts={() => handleSetActiveTab('shifts')} taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} currency={currency} storeName={storeName} setDrawerBalance={setDrawerBalance} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} users={users} />;
+      case 'pos': return <POSScreen currentUser={currentUser} items={saleableItems} customers={customers} categories={categories} onCompleteOrder={handleCompleteOrder} language={language} activeShift={activeShift} onAddCustomer={handleAddCustomer} onGoToShifts={() => handleSetActiveTab('shifts')} taxRate={taxRate} enableServiceFee={enableServiceFee} serviceFee={serviceFee} currency={currency} storeName={storeName} setDrawerBalance={setDrawerBalance} invoiceLogo={invoiceLogo} invoiceHeader={invoiceHeader} invoiceFooter={invoiceFooter} users={users} employees={staffEmployees} />;
       case 'tables': return <TableManagementScreen language={language} orders={orders} currentUser={currentUser} pushNotification={pushNotification} />;
       case 'drawer': return <DrawerScreen activeShift={activeShift} drawerBalance={drawerBalance} setDrawerBalance={setDrawerBalance} setMainSafeBalance={setMainSafeBalance} drawerLogs={drawerLogs} setDrawerLogs={setDrawerLogs} currency={currency} isRtl={isRtl} setCashLog={setCashLog} currentUser={currentUser} />;
       case 'shifts': return <ShiftScreen activeShift={activeShift} shifts={shifts} onOpenShift={handleOpenShift} onCloseShift={handleCloseShift} currentUser={currentUser} language={language} users={users} orders={orders} expenses={expenses} onLogout={handleLogout} storeName={storeName} currency={currency} drawerLogs={drawerLogs} />;
@@ -8471,8 +9115,8 @@ export default function App() {
       case 'settings': return <SettingsScreen currentUser={currentUser} users={users} language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} onUpdateUser={handleUpdateUser} userPermissions={userPermissions} setUserPermissions={setUserPermissions} storeName={storeName} setStoreName={setStoreName} currency={currency} setCurrency={setCurrency} taxRate={taxRate} setTaxRate={setTaxRate} enableServiceFee={enableServiceFee} setEnableServiceFee={setEnableServiceFee} serviceFee={serviceFee} setServiceFee={setServiceFee} pushNotification={pushNotification} invoiceLogo={invoiceLogo} setInvoiceLogo={setInvoiceLogo} invoiceHeader={invoiceHeader} setInvoiceHeader={setInvoiceHeader} invoiceFooter={invoiceFooter} setInvoiceFooter={setInvoiceFooter} customRoles={customRoles} setCustomRoles={setCustomRoles} />;
       case 'purchases': return <PurchasesScreen purchases={purchases} setPurchases={setPurchases} items={items} setItems={setItems} vouchers={vouchers} setVouchers={setVouchers} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'treasury': return <TreasuryScreen orders={orders} purchases={purchases} expenses={expenses} vouchers={vouchers} customerPayments={customerPayments} staffPayments={staffPayments} cashLog={cashLog} setCashLog={setCashLog} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} bankBalance={bankBalance} setBankBalance={setBankBalance} />;
-      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} customRoles={customRoles} invitations={invitations} setInvitations={setInvitations} />;
-      case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} vouchers={vouchers} />;
+      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} customRoles={customRoles} invitations={invitations} setInvitations={setInvitations} shifts={shifts} />;
+      case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} vouchers={vouchers} shifts={shifts} users={users} currentUser={currentUser} branchId={branchId} activeBranchName={activeBranchName} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
       case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
         ? <BranchManagement language={language} currentUser={currentUser} />
@@ -8644,7 +9288,8 @@ export default function App() {
     // SECRET ROUTE: /admin-master-u4
     // -----------------------------------------------------------------------
     if (currentPath === '/admin-master-u4') {
-      const isDev = (currentUser && (currentUser.id === 'u_4' || currentUser.role === 'admin' || currentUser.role === 'Owner' || currentUser.role === 'owner')) || localStorage.getItem('dev_override') === 'true';
+      const loggedInAsOwner = currentUser && (currentUser.role === 'Owner' || currentUser.role === 'owner');
+      const isDev = !loggedInAsOwner && ((currentUser && currentUser.id === 'u_4') || localStorage.getItem('dev_override') === 'true');
       if (isDev) {
         return (
           <div className="enterprise-ui min-h-screen transition-colors duration-200" style={{ background: theme === 'dark' ? '#07070d' : '#f8fafc', color: theme === 'dark' ? '#cbd5e1' : '#0f172a' }} dir={isRtl ? 'rtl' : 'ltr'}>
