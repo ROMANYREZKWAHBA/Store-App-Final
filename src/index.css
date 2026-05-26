@@ -25,14 +25,14 @@
   --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
 
   /* ── Brand Colors */
-  --accent-blue:   #1e40af;
-  --accent-blue-hover: #1e3a8a;
+  --accent-blue:   #1d4ed8;
+  --accent-blue-hover: #1e40af;
   --accent-blue-light: #eff6ff;
   --accent-gold:   #eab308;
   --accent-gold-muted: #fef9c3;
 
   /* Backwards-compat alias */
-  --accent-purple: #1e40af;
+  --accent-purple: #1d4ed8;
 
   /* ── Typography */
   --text-primary:   #0f172a;
@@ -45,8 +45,8 @@
 
   /* ── Sidebar active state */
   --sidebar-active-bg:   #eff6ff;
-  --sidebar-active-text: #1e40af;
-  --sidebar-active-border: #1e40af;
+  --sidebar-active-text: #1d4ed8;
+  --sidebar-active-border: #1d4ed8;
 }
 
 /* ── Dark Mode Override (persisted via pos_theme=dark) */

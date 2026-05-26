@@ -6791,6 +6791,8 @@ function NotFoundScreen({ language, onGoHome }) {
 export default function App() {
   // ⚡ Mount-only log guard — never logs again after initial render
   const _hasMounted = useRef(false);
+  // Ref to track if we have synced local data to cloud for the current branch to prevent infinite network loops
+  const lastSyncedBranchId = useRef(null);
   useEffect(() => {
     if (!_hasMounted.current) {
       _hasMounted.current = true;
@@ -7616,8 +7618,9 @@ export default function App() {
     localStorage.setItem('pos_tables', JSON.stringify(tables));
     localStorage.setItem('pos_reservations', JSON.stringify(reservations));
 
-    // Sync to Supabase cloud if branch is ready
-    if (branchId && cloudReady) {
+    // Sync to Supabase cloud if branch is ready (exactly ONCE per branch mount to prevent infinite network loops)
+    if (branchId && cloudReady && lastSyncedBranchId.current !== branchId) {
+      lastSyncedBranchId.current = branchId;
       // Batch sync all entities to cloud
       users.forEach(u => SB.saveUser(branchId, u));
       categories.forEach(c => SB.saveCategory(branchId, c));
