@@ -9,16 +9,17 @@ export default {
     extend: {
       colors: {
         blue: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#1d4ed8', // Vibrant royal/electric blue
-          600: '#1e40af', // Deep royal/navy blue
-          700: '#1e3a8a', // High-contrast dark blue
-          800: '#172554',
-          900: '#1e1b4b',
+          50: 'var(--blue-50, #eff6ff)',
+          100: 'var(--blue-100, #dbeafe)',
+          200: 'var(--blue-200, #bfdbfe)',
+          300: 'var(--blue-300, #93c5fd)',
+          400: 'var(--blue-400, #60a5fa)',
+          505: 'var(--blue-500, #3b82f6)', // Backwards-compat / standard blue
+          500: 'var(--blue-500, #3b82f6)',
+          600: 'var(--blue-600, #2563eb)',
+          700: 'var(--blue-700, #1d4ed8)',
+          800: 'var(--blue-800, #1e40af)',
+          900: 'var(--blue-900, #1e3a8a)',
         }
       }
     },

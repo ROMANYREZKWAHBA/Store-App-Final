@@ -12,7 +12,10 @@ import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
 import LandingPage from './LandingPage';
 import TableManagementScreen from './TableManagement';
-import { getCategories, getModifiers, getInitialItems, getDefaultUsers, getTranslations, appCurrency as defaultCurrency } from './utils/appDefaults';
+import { getCategories, getModifiers, getInitialItems, getDefaultUsers, getTranslations, appCurrency as defaultCurrency, ROLE_PERMISSIONS } from './utils/appDefaults';
+
+// Bind to window to prevent dynamic evaluation and context ReferenceErrors in production
+window.ROLE_PERMISSIONS = ROLE_PERMISSIONS;
 
 // Module-scoped variable to hold appCurrency safely
 let appCurrency = window.appCurrency || defaultCurrency || 'EGP';
@@ -2648,7 +2651,8 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
     const u = users.find(x => x.id === userId);
     if (!u) return [];
     if (userPermissions[userId]) return userPermissions[userId];
-    return ROLE_PERMISSIONS[u.role] || [];
+    const perms = window.ROLE_PERMISSIONS || {};
+    return perms[u.role] || [];
   };
 
   const togglePerm = (userId, tabId) => {
@@ -2659,7 +2663,8 @@ function SettingsScreen({ currentUser, users, language, setLanguage, theme, setT
 
   const resetPerms = (userId) => {
     const u = users.find(x => x.id === userId);
-    const defaultPerms = ROLE_PERMISSIONS[u?.role] || [];
+    const perms = window.ROLE_PERMISSIONS || {};
+    const defaultPerms = perms[u?.role] || [];
     setUserPermissions(prev => ({ ...prev, [userId]: [...defaultPerms] }));
   };
 
@@ -4053,19 +4058,22 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
   const t = getTranslations()[language];
   const isRtl = language === 'ar';
 
-  // Secret logo click counter for u_4 developer access
+  // Secret logo click counter for developer access
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef(null);
   const handleLogoClick = () => {
-    if (!currentUser) return;
-    const isDev = currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
-    if (!isDev) return;
     logoClickCount.current += 1;
     if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
     if (logoClickCount.current >= 5) {
       logoClickCount.current = 0;
-      window.history.pushState({}, '', '/admin-master-u4');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      const pin = prompt(isRtl ? 'أدخل رمز PIN للمطور للدخول:' : 'Enter Developer PIN to access:');
+      if (pin === '9999') {
+        localStorage.setItem('dev_override', 'true');
+        window.history.pushState({}, '', '/admin-master-u4');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (pin) {
+        alert(isRtl ? 'رمز PIN غير صحيح!' : 'Incorrect PIN!');
+      }
     } else {
       logoClickTimer.current = setTimeout(() => { logoClickCount.current = 0; }, 1500);
     }
@@ -4106,7 +4114,6 @@ function Sidebar({ activeTab, setActiveTab, onLogout, user, language, setLanguag
         { id: 'reports', label: t.reports, icon: '📈' },
         { id: 'branches', label: t.branches, icon: '🏢' },
         { id: 'settings', label: t.settings, icon: '⚙️' },
-        ...(currentUser?.id === 'u_4' ? [{ id: 'admin_panel', label: isRtl ? 'لوحة المسؤول' : 'Admin Panel', icon: '🛡️' }] : []),
       ]
     },
   ];
@@ -7576,6 +7583,26 @@ export default function App() {
     window.addEventListener('keydown', handleGlobalBailout, true);
     return () => window.removeEventListener('keydown', handleGlobalBailout, true);
   }, []);
+
+  // Secret key combo (Ctrl + Alt + A or Ctrl + Shift + A) to trigger Developer Access PIN prompt
+  useEffect(() => {
+    const handleAdminKeyCombo = (e) => {
+      if (e.ctrlKey && (e.altKey || e.shiftKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const pin = prompt(isRtl ? 'أدخل رمز PIN للمطور للدخول:' : 'Enter Developer PIN to access:');
+        if (pin === '9999') {
+          localStorage.setItem('dev_override', 'true');
+          window.history.pushState({}, '', '/admin-master-u4');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          pushNotification(isRtl ? 'تم منح صلاحيات المطور' : 'Developer Access Granted', 'success');
+        } else if (pin) {
+          alert(isRtl ? 'رمز PIN غير صحيح!' : 'Incorrect PIN!');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleAdminKeyCombo);
+    return () => window.removeEventListener('keydown', handleAdminKeyCombo);
+  }, [isRtl, pushNotification]);
 
   // Strict Branch Lock Guard for Non-Owner/Non-Admin Users
   useEffect(() => {

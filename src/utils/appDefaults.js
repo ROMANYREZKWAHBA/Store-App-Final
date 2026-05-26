@@ -78,3 +78,14 @@ export function getTranslations() {
 
 export const appCurrency = 'EGP';
 
+export const ROLE_PERMISSIONS = {
+  Owner: ['all'],
+  admin: ['all'],
+  Admin: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'staff', 'reports', 'logs', 'transfers', 'settings'],
+  Manager: ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'inventory', 'purchases', 'expenses', 'customers', 'reports', 'transfers'],
+  Cashier: ['pos', 'tables', 'shifts', 'customers'],
+  Accountant: ['dashboard', 'sales', 'expenses', 'treasury', 'reports', 'customers'],
+  Storekeeper: ['inventory', 'purchases', 'reports', 'transfers'],
+};
+
+
