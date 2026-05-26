@@ -7154,6 +7154,12 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('pos_reservations')) || []; } catch { return []; }
   });
 
+  const pushNotification = useCallback((message, type = 'info') => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
+  }, []);
+
   // =========================================================================
   // SUPABASE CLOUD BOOT: Load data from cloud on startup
   // =========================================================================
@@ -7170,30 +7176,6 @@ export default function App() {
       const globalStyle = document.createElement('style');
       globalStyle.id = 'luxury-app-styles';
       globalStyle.textContent = `
-        :root {
-          --accent-blue: #0066FF;
-          --accent-gold: #D4AF37;
-          --bg-main: #f8fafc;
-          --bg-card: #ffffff;
-          --bg-deep: #f1f5f9;
-          --bg-sidebar: #0f172a;
-          --text-primary: #0f172a;
-          --text-secondary: #475569;
-          --text-muted: #475569;
-          --border-color: #cbd5e1;
-        }
-
-        [data-theme='dark'] {
-          --bg-main: #0a0a0c;
-          --bg-card: #151518;
-          --bg-deep: #0f0f12;
-          --bg-sidebar: #050505;
-          --text-primary: #f8fafc;
-          --text-secondary: #cbd5e1;
-          --text-muted: #64748b;
-          --border-color: #222226;
-        }
-
         /* Global Typography Fixes */
         * { font-family: 'Inter', 'Cairo', sans-serif !important; }
         [dir="rtl"], [dir="rtl"] * { 
@@ -7665,12 +7647,6 @@ export default function App() {
     }
   }, [users, categories, items, orders, customers, expenses, customerPayments, activeShift, shifts, staffEmployees, staffPayments, drawerLogs, userPermissions, purchases, vouchers, cashLog, drawerBalance, mainSafeBalance, bankBalance, tables, reservations, branchId, cloudReady]);
 
-
-  const pushNotification = useCallback((message, type = 'info') => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
-  }, []);
 
   // Calculate stock
   const calculatedItems = useMemo(() => items.map(item => {
