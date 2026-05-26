@@ -1311,15 +1311,25 @@ function ShiftScreen({ activeShift, shifts, onOpenShift, onCloseShift, currentUs
   const shiftAnalysis = useMemo(() => {
     const shift = selectedShift || activeShift;
     if (!shift) return null;
+
+    const sOrders = orders.filter(o => o.shiftId === shift.id && o.status !== 'VOIDED' && o.status !== 'REFUNDED');
     const sLogs = drawerLogs.filter(l => l.shiftId === shift.id);
+
+    const cashSales = sOrders
+      .filter(o => o.paymentMethod === 'Cash' || !o.paymentMethod)
+      .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
     const totalIn = sLogs.filter(l => l.type === 'IN').reduce((s, l) => s + Number(l.amount), 0);
-    const totalOut = sLogs.filter(l => l.type === 'OUT').reduce((s, l) => s + Number(l.amount), 0);
-    const net = totalIn - totalOut;
+    // Exclude refund logs (DL-REF-) to prevent double-subtracting refunded sales
+    const totalOut = sLogs.filter(l => l.type === 'OUT' && !l.id.startsWith('DL-REF-')).reduce((s, l) => s + Number(l.amount), 0);
+
+    const net = cashSales + totalIn - totalOut;
     const expected = Number(shift.openingBalance) + net;
     const actual = selectedShift ? (selectedShift.actualCash || 0) : (Number(actualCash) || 0);
     const v = actual - expected;
+
     return { net, expected, variance: v, totalIn, totalOut };
-  }, [selectedShift, activeShift, drawerLogs, actualCash]);
+  }, [selectedShift, activeShift, orders, drawerLogs, actualCash]);
 
   const handleOpen = () => {
     const bal = parseFloat(openingBal);
@@ -3243,9 +3253,15 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
 
   // Sign up fields
   const [signUpStoreName, setSignUpStoreName] = useState('');
-  const [signUpName, setSignUpName] = useState('');
+  const [signUpName, setSignUpName] = useState(() => inviteContext?.name || '');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
+
+  useEffect(() => {
+    if (inviteContext?.name) {
+      setSignUpName(inviteContext.name);
+    }
+  }, [inviteContext]);
 
   const handleCredentials = async () => {
     setIsLoggingIn(true);
@@ -4386,13 +4402,28 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
     if (!fName.trim() || !fRole) return;
     const activeBranchIdForInvite = fBranchId || localStorage.getItem('active_branch_id') || '';
     const activeStoreName = localStorage.getItem('storeName') || 'StorePilot';
+    
+    const inviteId = 'INV-' + Date.now().toString(36).toUpperCase();
+    const newInvite = {
+      id: inviteId,
+      name: fName.trim(),
+      role: fRole,
+      branchId: activeBranchIdForInvite,
+      branchName: activeStoreName,
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    setInvitations(prev => [...prev, newInvite]);
+
     const params = new URLSearchParams({
       inviteToken: 'true',
+      inviteId: inviteId,
       storeId: activeBranchIdForInvite,
       role: fRole,
       storeName: activeStoreName,
+      name: fName.trim()
     });
-    const link = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    const link = `${window.location.origin}/join-branch?${params.toString()}`;
     setGeneratedInviteLink(link);
     setInviteLinkCopied(false);
   };
@@ -6646,15 +6677,19 @@ function ReportsScreen({ orders, purchases, expenses, items, customers, customer
 // ============================================================
 function calculateExpectedCash(openingBalance, shiftOrders, shiftExpenses, shiftAdvances = [], shiftDrawerLogs = []) {
   const cashSales = shiftOrders
-    .filter(o => o.paymentMethod === 'Cash' || !o.paymentMethod)
+    .filter(o => (o.paymentMethod === 'Cash' || !o.paymentMethod) && o.status !== 'VOIDED' && o.status !== 'REFUNDED')
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
 
-  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const totalAdvances = shiftAdvances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-  const drawerIn = shiftDrawerLogs.filter(l => l.type === 'IN').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
-  const drawerOut = shiftDrawerLogs.filter(l => l.type === 'OUT').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+  const drawerIn = shiftDrawerLogs
+    .filter(l => l.type === 'IN')
+    .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
 
-  const expected = (Number(openingBalance) || 0) + cashSales + drawerIn - (totalAdvances + totalExpenses + drawerOut);
+  // Exclude refund logs (DL-REF-) to prevent double-subtracting refunded sales
+  const drawerOut = shiftDrawerLogs
+    .filter(l => l.type === 'OUT' && !l.id.startsWith('DL-REF-'))
+    .reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+  const expected = (Number(openingBalance) || 0) + cashSales + drawerIn - drawerOut;
   return expected;
 }
 
@@ -6832,7 +6867,29 @@ export default function App() {
   // Handles /admin-master-u4 (secret developer route) and /signup?inviteToken=...
   // =========================================================================
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const [inviteContext, setInviteContext] = useState(null);
+  
+  // Synchronously initialize invite context from URL query/path on start
+  const [inviteContext, setInviteContext] = useState(() => {
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('inviteToken');
+    const storeId = params.get('storeId');
+    const role = params.get('role');
+    const storeName = params.get('storeName');
+    const inviteId = params.get('inviteId');
+    const name = params.get('name');
+
+    if ((token === 'true' || path === '/join-branch') && storeId && role) {
+      const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
+      const decodedName = name ? decodeURIComponent(name) : '';
+      return { storeId, role, storeName: decodedStoreName, inviteId, name: decodedName };
+    }
+    return null;
+  });
+
+  const [invitations, setInvitations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pos_invitations')) || []; } catch { return []; }
+  });
 
   // ⚡ STRICT ONCE-ON-MOUNT URL PARSING
   // hasParsedUrl guarantees the initial invite-param extraction runs exactly once.
@@ -6841,29 +6898,33 @@ export default function App() {
 
   useEffect(() => {
     const parseParams = () => {
+      const path = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
       const token = params.get('inviteToken');
       const storeId = params.get('storeId');
       const role = params.get('role');
       const storeName = params.get('storeName');
+      const inviteId = params.get('inviteId');
+      const name = params.get('name');
 
-      if (token === 'true' && storeId && role) {
+      if ((token === 'true' || path === '/join-branch') && storeId && role) {
         const decodedStoreName = storeName ? decodeURIComponent(storeName) : '';
+        const decodedName = name ? decodeURIComponent(name) : '';
         setInviteContext(prev => {
-          // Strict primitive equality — never create a new object if nothing changed
           if (
             prev &&
             prev.storeId === storeId &&
             prev.role === role &&
-            prev.storeName === decodedStoreName
+            prev.storeName === decodedStoreName &&
+            prev.inviteId === inviteId &&
+            prev.name === decodedName
           ) {
-            return prev; // bail — no re-render
+            return prev;
           }
-          return { storeId, role, storeName: decodedStoreName };
+          return { storeId, role, storeName: decodedStoreName, inviteId, name: decodedName };
         });
       } else {
-        // Only null-out if the URL genuinely has no invite token
-        if (window.location.search.indexOf('inviteToken') === -1) {
+        if (window.location.search.indexOf('inviteToken') === -1 && path !== '/join-branch') {
           setInviteContext(prev => (prev !== null ? null : prev));
         }
       }
@@ -7046,9 +7107,10 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [showAuth, setShowAuth] = useState(() => {
-    if (inviteContext !== null) return true;
     const path = window.location.pathname;
-    return path === '/login';
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('inviteToken');
+    return path === '/login' || path === '/join-branch' || token === 'true';
   });
 
   // Unified navigation helper updating path and state history
@@ -7586,17 +7648,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleAdminKeyCombo);
   }, [isRtl, pushNotification]);
 
-  // Strict Branch Lock Guard for Non-Owner/Non-Admin Users
+  // Strict Branch Lock Guard for all users except System Developer/Owner (u_4)
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'Owner' && currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+    const isDev = currentUser && (currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true');
+    if (currentUser && !isDev) {
       const userBranchId = currentUser.assignedBranchId || currentUser.branchId;
       if (userBranchId && branchId !== userBranchId) {
         setBranchId(userBranchId);
         setActiveBranchName(currentUser.assignedBranchName || '');
         localStorage.setItem('active_branch_id', userBranchId);
-        if (currentUser.assignedBranchName) {
-          localStorage.setItem('active_branch_name', currentUser.assignedBranchName);
-        }
+        localStorage.setItem('active_branch_name', currentUser.assignedBranchName || '');
         reloadBranchData(userBranchId);
       }
     }
@@ -7626,6 +7687,7 @@ export default function App() {
     localStorage.setItem('pos_bankBalance', bankBalance.toString());
     localStorage.setItem('pos_tables', JSON.stringify(tables));
     localStorage.setItem('pos_reservations', JSON.stringify(reservations));
+    localStorage.setItem('pos_invitations', JSON.stringify(invitations));
 
     // Sync to Supabase cloud if branch is ready (exactly ONCE per branch mount to prevent infinite network loops)
     if (branchId && cloudReady && lastSyncedBranchId.current !== branchId) {
@@ -7645,7 +7707,7 @@ export default function App() {
       // Save balances to settings
       SB.saveSettings(branchId, { drawer_balance: drawerBalance, main_safe_balance: mainSafeBalance, bank_balance: bankBalance });
     }
-  }, [users, categories, items, orders, customers, expenses, customerPayments, activeShift, shifts, staffEmployees, staffPayments, drawerLogs, userPermissions, purchases, vouchers, cashLog, drawerBalance, mainSafeBalance, bankBalance, tables, reservations, branchId, cloudReady]);
+  }, [users, categories, items, orders, customers, expenses, customerPayments, activeShift, shifts, staffEmployees, staffPayments, drawerLogs, userPermissions, purchases, vouchers, cashLog, drawerBalance, mainSafeBalance, bankBalance, tables, reservations, invitations, branchId, cloudReady]);
 
 
   // Calculate stock
@@ -7682,6 +7744,12 @@ export default function App() {
       if (inviteCtx && inviteCtx.storeId) {
         const targetBranchId = inviteCtx.storeId;
         const staffRole = inviteCtx.role || 'Cashier';
+        const inviteId = inviteCtx.inviteId;
+
+        // Mark the invitation as completed in state
+        if (inviteId) {
+          setInvitations(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'COMPLETED' } : inv));
+        }
 
         const newStaffUser = {
           id: userId,
@@ -7990,14 +8058,15 @@ export default function App() {
         }
 
         // Bind session to user's assigned branch
-        if (cloudUser.assignedBranchId && cloudUser.role !== 'Owner') {
+        const isDev = cloudUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
+        if (cloudUser.assignedBranchId && !isDev) {
           setBranchId(cloudUser.assignedBranchId);
           setActiveBranchName(cloudUser.assignedBranchName || '');
           localStorage.setItem('active_branch_id', cloudUser.assignedBranchId);
           localStorage.setItem('active_branch_name', cloudUser.assignedBranchName || '');
           // Reload data scoped to the user's assigned branch
           await reloadBranchData(cloudUser.assignedBranchId);
-        } else if (cloudUser.role === 'Owner' && branchId) {
+        } else if ((cloudUser.role === 'Owner' || isDev) && branchId) {
           // Owner keeps existing machine branch
           setActiveBranchName('Main Branch');
           localStorage.setItem('active_branch_id', branchId);
@@ -8034,13 +8103,14 @@ export default function App() {
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
         console.log("=== YOUR REAL USER ID ===", found.id);
-        if (found.assignedBranchId && found.role !== 'Owner') {
+        const isDev = found.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
+        if (found.assignedBranchId && !isDev) {
           setBranchId(found.assignedBranchId);
           setActiveBranchName(found.assignedBranchName || '');
           localStorage.setItem('active_branch_id', found.assignedBranchId);
           localStorage.setItem('active_branch_name', found.assignedBranchName || '');
           await reloadBranchData(found.assignedBranchId);
-        } else if (found.role === 'Owner' && branchId) {
+        } else if ((found.role === 'Owner' || isDev) && branchId) {
           setActiveBranchName('Main Branch');
           localStorage.setItem('active_branch_id', branchId);
           localStorage.setItem('active_branch_name', 'Main Branch');
@@ -8335,6 +8405,7 @@ export default function App() {
             setTrialDaysLeft={setTrialDaysLeft}
             storeName={storeName}
             pushNotification={pushNotification}
+            theme={theme}
           />
         );
       default: return <PlaceholderScreen title={activeTab} icon="🔧" language={language} />;
@@ -8475,21 +8546,30 @@ export default function App() {
       const isDev = currentUser && (currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true');
       if (isDev) {
         return (
-          <div className="enterprise-ui min-h-screen" style={{ background: '#f8fafc' }} dir={isRtl ? 'rtl' : 'ltr'}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+          <div className="enterprise-ui min-h-screen transition-colors duration-200" style={{ background: theme === 'dark' ? '#07070d' : '#f8fafc', color: theme === 'dark' ? '#cbd5e1' : '#0f172a' }} dir={isRtl ? 'rtl' : 'ltr'}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: theme === 'dark' ? '#0c0c14' : '#fff', borderBottom: theme === 'dark' ? '1px solid #1e2030' : '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, background: '#1e40af', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🛡️</div>
+                <div style={{ width: 32, height: 32, background: '#2563eb', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🛡️</div>
                 <div>
-                  <p style={{ margin: 0, fontWeight: 900, fontSize: 13, color: '#1e293b' }}>Master Control Panel</p>
-                  <p style={{ margin: 0, fontSize: 10, color: '#64748b', fontWeight: 600 }}>Developer Access — u_4</p>
+                  <p style={{ margin: 0, fontWeight: 900, fontSize: 13, color: theme === 'dark' ? '#f1f5f9' : '#1e293b' }}>Master Control Panel</p>
+                  <p style={{ margin: 0, fontSize: 10, color: theme === 'dark' ? '#64748b' : '#64748b', fontWeight: 600 }}>Developer Access — u_4</p>
                 </div>
               </div>
-              <button
-                onClick={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
-                style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: '#64748b' }}
-              >
-                {isRtl ? '← خروج' : '← Exit'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: theme === 'dark' ? '#131320' : '#f1f5f9', border: theme === 'dark' ? '1px solid #1e2030' : '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', color: theme === 'dark' ? '#cbd5e1' : '#475569' }}
+                  title={isRtl ? (theme === 'dark' ? 'الوضع المضيء' : 'الوضع المظلم') : (theme === 'dark' ? 'Light Mode' : 'Dark Mode')}
+                >
+                  <span style={{ fontSize: 16 }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+                </button>
+                <button
+                  onClick={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+                  style={{ padding: '8px 16px', background: theme === 'dark' ? '#131320' : '#f1f5f9', border: theme === 'dark' ? '1px solid #1e2030' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', color: theme === 'dark' ? '#cbd5e1' : '#64748b' }}
+                >
+                  {isRtl ? '← خروج' : '← Exit'}
+                </button>
+              </div>
             </div>
             <AdminMasterPanel
               users={users}
@@ -8502,6 +8582,7 @@ export default function App() {
               setTrialDaysLeft={setTrialDaysLeft}
               storeName={storeName}
               pushNotification={pushNotification}
+              theme={theme}
             />
             <NotificationOverlay notifications={notifications} onDismiss={id => setNotifications(prev => prev.filter(n => n.id !== id))} />
           </div>
