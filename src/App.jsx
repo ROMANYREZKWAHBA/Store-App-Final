@@ -4365,7 +4365,7 @@ function SubscriptionWarningBanner({ daysLeft, onRenew, language }) {
 // ============================================================
 // STAFF SCREEN - Full Implementation
 // ============================================================
-function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift, customRoles }) {
+function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, users, setUsers, currentUser, language, pushNotification, activeShift, customRoles, invitations = [], setInvitations }) {
   const isRtl = language === 'ar';
   const [view, setView] = useState('employees'); // 'employees' | 'users'
   const [search, setSearch] = useState('');
@@ -4707,6 +4707,102 @@ function StaffScreen({ employees, setEmployees, paymentsMap, setPaymentsMap, use
               <p className="font-black uppercase text-sm mt-3">{employees.length === 0 ? (isRtl ? 'لا موظفين بعد — أضف أول موظف!' : 'No employees yet — add your first!') : (isRtl ? 'لا نتائج مطابقة' : 'No matches found')}</p>
             </div>
           )}
+
+          {/* Pending Invitations Section */}
+          {(() => {
+            const pendingInvites = (invitations || []).filter(inv => inv.status === 'PENDING');
+            if (pendingInvites.length === 0) return null;
+            return (
+              <div className="mt-8 border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">📧</span>
+                  <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">
+                    {isRtl ? 'سجل الدعوات المعلقة' : 'Pending Invitations Log'}
+                  </h3>
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {pendingInvites.length}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-medium" style={{ borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr className="border-b border-[var(--border-color)] text-[var(--text-muted)] text-[10px] font-black uppercase tracking-widest">
+                        <th className="py-3 px-4 text-right">{isRtl ? 'الاسم' : 'Name'}</th>
+                        <th className="py-3 px-4 text-right">{isRtl ? 'الدور المستهدف' : 'Target Role'}</th>
+                        <th className="py-3 px-4 text-right">{isRtl ? 'الفرع' : 'Branch'}</th>
+                        <th className="py-3 px-4 text-right">{isRtl ? 'تاريخ الإنشاء' : 'Created At'}</th>
+                        <th className="py-3 px-4 text-center">{isRtl ? 'رابط الدعوة' : 'Invitation Link'}</th>
+                        <th className="py-3 px-4 text-center">{isRtl ? 'خيارات' : 'Actions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {pendingInvites.map(inv => {
+                        const params = new URLSearchParams({
+                          inviteToken: 'true',
+                          inviteId: inv.id,
+                          storeId: inv.branchId,
+                          role: inv.role,
+                          storeName: inv.branchName,
+                          name: inv.name
+                        });
+                        const inviteUrl = `${window.location.origin}/join-branch?${params.toString()}`;
+
+                        return (
+                          <tr key={inv.id} className="hover:bg-[var(--bg-deep)] transition-colors">
+                            <td className="py-3.5 px-4 font-bold text-right text-[var(--text-primary)]">{inv.name}</td>
+                            <td className="py-3.5 px-4 text-right">
+                              <span className="px-2 py-1 text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-100">
+                                {inv.role}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right text-[var(--text-muted)] font-bold">{inv.branchName || inv.branchId}</td>
+                            <td className="py-3.5 px-4 text-right text-[var(--text-muted)] text-[10px]">{new Date(inv.createdAt).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</td>
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={inviteUrl}
+                                  className="bg-[var(--bg-deep)] border border-[var(--border-color)] text-[10px] text-[var(--text-muted)] px-2 py-1 rounded w-48 text-ellipsis overflow-hidden whitespace-nowrap outline-none"
+                                  onClick={(e) => e.target.select()}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(inviteUrl);
+                                    pushNotification(isRtl ? 'تم نسخ الرابط بنجاح' : 'Link copied successfully', 'success');
+                                  }}
+                                  className="bg-[#0066FF] hover:bg-blue-600 text-[var(--text-primary)] text-[10px] font-black px-3 py-1 rounded-none uppercase transition-all"
+                                >
+                                  {isRtl ? 'نسخ' : 'Copy'}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(isRtl ? 'هل أنت متأكد من حذف هذه الدعوة؟' : 'Are you sure you want to delete this invitation?')) {
+                                    setInvitations(prev => prev.filter(item => item.id !== inv.id));
+                                    pushNotification(isRtl ? 'تم حذف الدعوة' : 'Invitation deleted', 'info');
+                                  }
+                                }}
+                                className="text-rose-500 hover:text-rose-700 text-xs font-black"
+                                title={isRtl ? 'حذف' : 'Delete'}
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -6964,14 +7060,17 @@ export default function App() {
           }
         } else if (screen === 'admin_panel_master') {
           const cachedUser = localStorage.getItem('pos_current_user');
+          const hasDevOverride = localStorage.getItem('dev_override') === 'true';
           if (cachedUser) {
             const user = JSON.parse(cachedUser);
-            if (user.id === 'u_4' || localStorage.getItem('dev_override') === 'true') {
+            if (user.id === 'u_4' || user.role === 'admin' || user.role === 'Owner' || user.role === 'owner' || hasDevOverride) {
               setCurrentUser(user);
               setShowAuth(false);
             } else {
               window.history.replaceState({ screen: 'landing' }, '', '/');
             }
+          } else if (hasDevOverride) {
+            setShowAuth(false);
           } else {
             window.history.replaceState({ screen: 'auth' }, '', '/login');
           }
@@ -6984,6 +7083,8 @@ export default function App() {
         } else if (path === '/login') {
           setCurrentUser(null);
           setShowAuth(true);
+        } else if (path === '/admin-master-u4') {
+          setShowAuth(false);
         } else {
           const tab = path.substring(1);
           const validTabs = ['dashboard', 'pos', 'tables', 'shifts', 'sales', 'customers', 'expenses', 'inventory', 'purchases', 'treasury', 'staff', 'drawer', 'reports', 'settings', 'admin_panel'];
@@ -7009,7 +7110,10 @@ export default function App() {
     let initialTab = null;
 
     const cachedUser = localStorage.getItem('pos_current_user');
-    if (cachedUser) {
+    if (path === '/admin-master-u4') {
+      initialScreen = 'admin_panel_master';
+      window.history.replaceState({ screen: 'admin_panel_master', tab: null }, '', path);
+    } else if (cachedUser) {
       initialScreen = 'dashboard';
       const initialTabVal = getInitialTab();
       initialTab = initialTabVal;
@@ -7023,9 +7127,6 @@ export default function App() {
     } else if (path === '/login') {
       initialScreen = 'auth';
       window.history.replaceState({ screen: 'auth', tab: null }, '', path);
-    } else if (path === '/admin-master-u4') {
-      initialScreen = 'admin_panel_master';
-      window.history.replaceState({ screen: 'admin_panel_master', tab: null }, '', path);
     } else {
       window.history.replaceState({ screen: 'landing', tab: null }, '', path);
     }
@@ -7650,7 +7751,7 @@ export default function App() {
 
   // Strict Branch Lock Guard for all users except System Developer/Owner (u_4)
   useEffect(() => {
-    const isDev = currentUser && (currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true');
+    const isDev = (currentUser && (currentUser.id === 'u_4' || currentUser.role === 'admin' || currentUser.role === 'Owner' || currentUser.role === 'owner')) || localStorage.getItem('dev_override') === 'true';
     if (currentUser && !isDev) {
       const userBranchId = currentUser.assignedBranchId || currentUser.branchId;
       if (userBranchId && branchId !== userBranchId) {
@@ -8058,7 +8159,7 @@ export default function App() {
         }
 
         // Bind session to user's assigned branch
-        const isDev = cloudUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
+        const isDev = cloudUser.id === 'u_4' || cloudUser.role === 'admin' || cloudUser.role === 'Owner' || cloudUser.role === 'owner' || localStorage.getItem('dev_override') === 'true';
         if (cloudUser.assignedBranchId && !isDev) {
           setBranchId(cloudUser.assignedBranchId);
           setActiveBranchName(cloudUser.assignedBranchName || '');
@@ -8103,7 +8204,7 @@ export default function App() {
         pushNotification(isRtl ? 'تم الدخول في الوضع الأوفلاين مؤقتاً' : 'Logged in offline temporarily', 'warning');
         setCurrentUser(found);
         console.log("=== YOUR REAL USER ID ===", found.id);
-        const isDev = found.id === 'u_4' || localStorage.getItem('dev_override') === 'true';
+        const isDev = found.id === 'u_4' || found.role === 'admin' || found.role === 'Owner' || found.role === 'owner' || localStorage.getItem('dev_override') === 'true';
         if (found.assignedBranchId && !isDev) {
           setBranchId(found.assignedBranchId);
           setActiveBranchName(found.assignedBranchName || '');
@@ -8370,7 +8471,7 @@ export default function App() {
       case 'settings': return <SettingsScreen currentUser={currentUser} users={users} language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} onUpdateUser={handleUpdateUser} userPermissions={userPermissions} setUserPermissions={setUserPermissions} storeName={storeName} setStoreName={setStoreName} currency={currency} setCurrency={setCurrency} taxRate={taxRate} setTaxRate={setTaxRate} enableServiceFee={enableServiceFee} setEnableServiceFee={setEnableServiceFee} serviceFee={serviceFee} setServiceFee={setServiceFee} pushNotification={pushNotification} invoiceLogo={invoiceLogo} setInvoiceLogo={setInvoiceLogo} invoiceHeader={invoiceHeader} setInvoiceHeader={setInvoiceHeader} invoiceFooter={invoiceFooter} setInvoiceFooter={setInvoiceFooter} customRoles={customRoles} setCustomRoles={setCustomRoles} />;
       case 'purchases': return <PurchasesScreen purchases={purchases} setPurchases={setPurchases} items={items} setItems={setItems} vouchers={vouchers} setVouchers={setVouchers} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} />;
       case 'treasury': return <TreasuryScreen orders={orders} purchases={purchases} expenses={expenses} vouchers={vouchers} customerPayments={customerPayments} staffPayments={staffPayments} cashLog={cashLog} setCashLog={setCashLog} activeShift={activeShift} currentUser={currentUser} language={language} users={users} pushNotification={pushNotification} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} bankBalance={bankBalance} setBankBalance={setBankBalance} />;
-      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} customRoles={customRoles} />;
+      case 'staff': return <StaffScreen employees={staffEmployees} setEmployees={setStaffEmployees} paymentsMap={staffPayments} setPaymentsMap={setStaffPayments} users={users} setUsers={setUsers} currentUser={currentUser} language={language} pushNotification={pushNotification} activeShift={activeShift} setDrawerBalance={setDrawerBalance} setDrawerLogs={setDrawerLogs} setMainSafeBalance={setMainSafeBalance} setCashLog={setCashLog} customRoles={customRoles} invitations={invitations} setInvitations={setInvitations} />;
       case 'reports': return <ReportsScreen orders={orders} purchases={purchases} expenses={expenses} items={calculatedItems} customers={customers} customerPayments={customerPayments} language={language} vouchers={vouchers} />;
       case 'transfers': return <StockTransfersScreen currentUser={currentUser} branchId={branchId} items={calculatedItems} language={language} pushNotification={pushNotification} />;
       case 'branches': return (currentUser.role === 'Owner' || currentUser.role === 'admin')
@@ -8543,7 +8644,7 @@ export default function App() {
     // SECRET ROUTE: /admin-master-u4
     // -----------------------------------------------------------------------
     if (currentPath === '/admin-master-u4') {
-      const isDev = currentUser && (currentUser.id === 'u_4' || localStorage.getItem('dev_override') === 'true');
+      const isDev = (currentUser && (currentUser.id === 'u_4' || currentUser.role === 'admin' || currentUser.role === 'Owner' || currentUser.role === 'owner')) || localStorage.getItem('dev_override') === 'true';
       if (isDev) {
         return (
           <div className="enterprise-ui min-h-screen transition-colors duration-200" style={{ background: theme === 'dark' ? '#07070d' : '#f8fafc', color: theme === 'dark' ? '#cbd5e1' : '#0f172a' }} dir={isRtl ? 'rtl' : 'ltr'}>
