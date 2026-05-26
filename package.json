@@ -7,11 +7,11 @@
   "main": "main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node sanitize-build.cjs",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron-build": "vite build && node sanitize-build.cjs && npx javascript-obfuscator ./dist/assets --output ./dist/assets --config obfuscator-config.json --target browser && node sanitize-build.cjs && cross-env VITE_APP_BASE=./ node secure-build.js"
+    "electron-build": "vite build && cross-env VITE_APP_BASE=./ node secure-build.js"
   },
   "build": {
     "appId": "com.storepilot.app",
