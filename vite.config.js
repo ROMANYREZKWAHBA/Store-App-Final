@@ -1,11 +1,43 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Base path configuration:
-// - Vercel / any web server → '/' (absolute paths work for all routes)
-// - Electron local-file builds → use VITE_APP_BASE='./' in the electron-build script
-//   because Electron loads from file:// and needs relative asset paths.
 export default defineConfig({
   base: process.env.VITE_APP_BASE ?? '/',
   plugins: [react()],
+
+  // Configure esbuild options to strictly preserve function names and avoid variable smashing
+  esbuild: {
+    keepNames: true,
+    minifyIdentifiers: false
+  },
+
+  build: {
+    // Configure esbuild options within build object as well for complete coverage
+    esbuild: {
+      keepNames: true,
+      minifyIdentifiers: false
+    },
+    // Ensure minifyInternalExports is set to false
+    rollupOptions: {
+      output: {
+        minifyInternalExports: false,
+        keepNames: true,
+        minify: {
+          mangle: false
+        }
+      }
+    },
+    // Mirror these output options to rolldownOptions since Vite 8 uses Rolldown natively
+    rolldownOptions: {
+      output: {
+        minifyInternalExports: false,
+        keepNames: true,
+        minify: {
+          mangle: false
+        }
+      }
+    }
+  }
 })
+
+
