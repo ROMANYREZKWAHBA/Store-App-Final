@@ -12,11 +12,14 @@ import SubscriptionSelectionScreen from './SubscriptionSelectionScreen';
 import AdminMasterPanel from './AdminMasterPanel';
 import LandingPage from './LandingPage';
 import TableManagementScreen from './TableManagement';
-import { getCategories, getModifiers, getInitialItems, getDefaultUsers, getTranslations } from './utils/appDefaults';
+import { getCategories, getModifiers, getInitialItems, getDefaultUsers, getTranslations, appCurrency as defaultCurrency } from './utils/appDefaults';
+
+// Module-scoped variable to hold appCurrency safely
+let appCurrency = window.appCurrency || defaultCurrency || 'EGP';
 
 function formatMoney(amount) {
   const num = Number(amount) || 0;
-  const currency = window.appCurrency || 'EGP';
+  const currency = appCurrency || 'EGP';
   return `${num.toFixed(2)} ${currency}`;
 }
 
@@ -7091,6 +7094,7 @@ export default function App() {
   // Hook appCurrency to state + sync settings to Supabase
   useEffect(() => {
     appCurrency = currency;
+    window.appCurrency = currency;
     localStorage.setItem('currency', currency);
     localStorage.setItem('taxRate', taxRate);
     localStorage.setItem('enableServiceFee', enableServiceFee);

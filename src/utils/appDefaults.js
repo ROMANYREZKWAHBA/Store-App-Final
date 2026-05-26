@@ -75,3 +75,6 @@ export function getTranslations() {
     }
   };
 }
+
+export const appCurrency = 'EGP';
+
