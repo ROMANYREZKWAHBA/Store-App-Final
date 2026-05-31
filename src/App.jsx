@@ -7501,6 +7501,7 @@ export default function App() {
   const [language, setLanguage] = useState('ar');
   const isRtl = language === 'ar';
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [branchId, setBranchId] = useState(() => localStorage.getItem('active_branch_id') || null);
   const [activeBranchName, setActiveBranchName] = useState(() => localStorage.getItem('active_branch_name') || '');
@@ -9088,6 +9089,7 @@ export default function App() {
       return;
     }
     setActiveTab(tab);
+    setMobileSidebarOpen(false);
     navigateTo('dashboard', tab);
   };
 
@@ -9194,7 +9196,7 @@ export default function App() {
   }, [dashDaysLeft]);
 
   const renderDashboard = () => (
-    <div className="flex min-h-screen w-full transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="flex flex-col md:flex-row min-h-screen w-full transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Offline Warning Banner */}
       {!isOnline && (
@@ -9203,20 +9205,88 @@ export default function App() {
         </div>
       )}
 
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={handleSetActiveTab}
-        onLogout={handleLogout}
-        user={currentUser}
-        language={language}
-        setLanguage={setLanguage}
-        userPermissions={userPermissions}
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
-        activeBranchName={activeBranchName}
-        theme={theme}
-        customRoles={customRoles}
-      />
+      {/* Mobile Top Bar */}
+      <div className="flex md:hidden items-center justify-between px-4 py-3 bg-[var(--bg-card)] border-b border-[var(--border-color)] shrink-0 z-40">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 -ml-2 text-[var(--text-primary)] hover:bg-[var(--bg-deep)] transition-colors rounded"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span className="font-black text-sm uppercase tracking-wider text-[var(--accent-blue)]">
+            StorePilot PRO
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {activeBranchName && (
+            <span className="text-[10px] bg-[var(--accent-blue-light)] text-[var(--accent-blue)] px-2.5 py-1 rounded-full font-bold">
+              {activeBranchName}
+            </span>
+          )}
+          {activeShift && (
+            <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a] animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Sidebar Overlay Drawer */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden" dir={isRtl ? 'rtl' : 'ltr'}>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          {/* Sidebar Drawer */}
+          <div className="relative z-10 flex flex-col h-full bg-[var(--bg-sidebar)] transition-transform duration-200">
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={handleSetActiveTab}
+              onLogout={handleLogout}
+              user={currentUser}
+              language={language}
+              setLanguage={setLanguage}
+              userPermissions={userPermissions}
+              collapsed={false}
+              setCollapsed={setCollapsed}
+              activeBranchName={activeBranchName}
+              theme={theme}
+              customRoles={customRoles}
+            />
+            {/* Close button on mobile sidebar top corner */}
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              className={`absolute top-4 ${isRtl ? 'left-[-44px]' : 'right-[-44px]'} p-2 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-full hover:bg-[var(--bg-deep)]`}
+              style={{ zIndex: 100 }}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar Wrapper */}
+      <div className="hidden md:flex flex-col flex-shrink-0">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={handleSetActiveTab}
+          onLogout={handleLogout}
+          user={currentUser}
+          language={language}
+          setLanguage={setLanguage}
+          userPermissions={userPermissions}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          activeBranchName={activeBranchName}
+          theme={theme}
+          customRoles={customRoles}
+        />
+      </div>
 
       <main className="flex-1 flex flex-col min-h-0 transition-colors duration-200 relative" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', borderLeft: isRtl ? '1px solid var(--border-color)' : 'none', borderRight: !isRtl ? 'none' : 'none' }}>
         <SubscriptionWarningBanner
@@ -9278,7 +9348,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }}>
+        <div className="flex-1 w-full p-4 md:p-6 overflow-y-auto transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }}>
           {renderTabContent()}
         </div>
       </main>
