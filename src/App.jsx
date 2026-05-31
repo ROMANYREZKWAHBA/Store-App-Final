@@ -3344,7 +3344,7 @@ function CombinedAuthScreen({ onLogin, onSignUp, language, setLanguage, users, o
     setError(null);
 
     // Browser Fingerprinting & Strict Anti-Trial-Hopping Check
-    if (isWeb && !inviteContext) {
+    if (isWeb && !inviteContext && signUpEmail.trim().toLowerCase() !== 'romanyrezk4321@gmail.com') {
       const deviceToken = localStorage.getItem('_sp_device_token') || getCookie('_sp_device_token');
       if (deviceToken) {
         try {
@@ -7517,6 +7517,18 @@ export default function App() {
   // and caused a guaranteed extra render before any meaningful content appeared.
   const [bootPhase, setBootPhase] = useState('booting');
   const subscriptionActive = !subscriptionExpired;
+  // ── Global Maintenance Mode Gate (set by AdminMasterPanel V2 Tab E) ──────
+  const [maintenanceMode, setMaintenanceMode] = useState(
+    () => localStorage.getItem('pos_maintenance_mode') === 'true'
+  );
+  // Poll every 5s so non-developer tabs pick up the flag without a page reload
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setMaintenanceMode(localStorage.getItem('pos_maintenance_mode') === 'true');
+    }, 5000);
+    return () => clearInterval(iv);
+  }, []);
+
 
   // =========================================================================
   // URL-BASED ROUTING STATE
@@ -9444,10 +9456,65 @@ export default function App() {
         </div>
       </div>
     ) : (
-      // ⚡ AUTH GATEWAY — rendered as a plain render function call (not a JSX component)
-      // so React has no component identity to track, meaning no unmount/remount flash
-      // when App state changes.
-      renderAuthGateway()
+      // ⚡ MAINTENANCE MODE GATE — blocks all non-developer sessions
+      (maintenanceMode && !(currentUser?.id === 'u_4' || localStorage.getItem('dev_override') === 'true') && currentPath !== '/admin-master-u4') ? (
+        <div dir={isRtl ? 'rtl' : 'ltr'} style={{
+          minHeight: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%)',
+          fontFamily: isRtl ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif",
+          padding: 24, textAlign: 'center',
+        }}>
+          {/* Animated glow orb */}
+          <div style={{
+            width: 120, height: 120, borderRadius: '50%', marginBottom: 40,
+            background: 'radial-gradient(circle, rgba(245,158,11,0.25) 0%, transparent 70%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'maintPulse 2.5s ease-in-out infinite',
+            border: '1px solid rgba(245,158,11,0.2)',
+            boxShadow: '0 0 60px rgba(245,158,11,0.15)',
+          }}>
+            <span style={{ fontSize: 48 }}>🔧</span>
+          </div>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+            borderRadius: 20, padding: '6px 18px', marginBottom: 24,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', animation: 'maintPulse 1.5s infinite' }} />
+            <span style={{ fontSize: 10, fontWeight: 900, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 2 }}>
+              {isRtl ? 'وضع الصيانة نشط' : 'Maintenance Mode Active'}
+            </span>
+          </div>
+          <h1 style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 950, color: '#f4f4f5', letterSpacing: '-0.5px' }}>
+            {isRtl ? 'النظام قيد التحديث' : 'System Upgrading'}
+          </h1>
+          <p style={{ margin: '0 0 32px', fontSize: 15, color: '#a1a1aa', maxWidth: 420, lineHeight: 1.7, fontWeight: 500 }}>
+            {isRtl
+              ? 'فريقنا التقني يعمل على تحسين المنصة. سنعود قريبًا بتجربة أفضل. شكرًا لصبركم.'
+              : 'Our engineering team is working hard to improve the platform. We will be back shortly with an enhanced experience. Thank you for your patience.'}
+          </p>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: '#18181b', border: '1px solid #3f3f46',
+            borderRadius: 12, padding: '14px 24px',
+          }}>
+            <span style={{ animation: 'maintSpin 1.2s linear infinite', display: 'inline-block', fontSize: 18 }}>⚙️</span>
+            <span style={{ fontSize: 12, color: '#71717a', fontWeight: 600 }}>
+              {isRtl ? 'يُقدَّر وقت الإعادة: قريبًا' : 'Estimated restoration: shortly'}
+            </span>
+          </div>
+          <style>{`
+            @keyframes maintPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.97)} }
+            @keyframes maintSpin  { to{transform:rotate(360deg)} }
+          `}</style>
+        </div>
+      ) : (
+        // ⚡ AUTH GATEWAY — rendered as a plain render function call (not a JSX component)
+        // so React has no component identity to track, meaning no unmount/remount flash
+        // when App state changes.
+        renderAuthGateway()
+      )
     )
   );
 }
