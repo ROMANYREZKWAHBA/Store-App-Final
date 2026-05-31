@@ -97,7 +97,12 @@
 /* ================================================================
    BODY BASE
 ================================================================= */
-body {
+html, body, #root {
+  min-width: 1400px !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh;
   margin: 0;
   background-color: var(--bg-deep);
   color: var(--text-primary);
@@ -110,7 +115,6 @@ body[dir="rtl"] {
 }
 
 #root {
-  min-height: 100svh;
   display: flex;
   flex-direction: column;
 }

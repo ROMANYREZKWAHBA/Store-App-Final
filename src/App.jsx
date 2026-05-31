@@ -9194,7 +9194,7 @@ export default function App() {
   }, [dashDaysLeft]);
 
   const renderDashboard = () => (
-    <div className="flex h-screen w-screen transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="flex min-h-screen w-full transition-colors duration-200" style={{ background: 'var(--bg-deep)', color: 'var(--text-primary)' }} dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Offline Warning Banner */}
       {!isOnline && (
