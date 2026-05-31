@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useContext, createContext } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLAN CONSTANTS
@@ -7,49 +7,75 @@ const PLAN_MONTHLY_EGP = 299;
 const PLAN_ANNUAL_EGP  = 2990;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LUXURY INDUSTRIAL DESIGN TOKENS  (Zinc-950/900 + Amber)
+// THEME CONTEXT — the single source of truth for all color tokens.
+// Populated once inside AdminMasterPanel via useMemo; every sub-component
+// reads from it via useContext(ThemeCtx) instead of a stale module-level `C`.
 // ─────────────────────────────────────────────────────────────────────────────
-const C = {
-  bgMain:        '#09090b',   // zinc-950
-  bgCard:        '#18181b',   // zinc-900
-  bgElevated:    '#1c1c1f',   // zinc-800-ish card surface
-  bgDeep:        '#09090b',
-  bgShaded:      'rgba(255,255,255,0.025)',
-  border:        '#3f3f46',   // zinc-700
-  borderThin:    '#27272a',   // zinc-800
-  textPrimary:   '#f4f4f5',   // zinc-100
-  textSecondary: '#a1a1aa',   // zinc-400
-  textMuted:     '#52525b',   // zinc-600
-
-  amber:         '#f59e0b',   // amber-400
-  amberDark:     '#d97706',   // amber-600
-  amberBg:       'rgba(245,158,11,0.08)',
-  amberBorder:   'rgba(245,158,11,0.25)',
-
-  success:       '#10b981',
-  successBg:     'rgba(16,185,129,0.08)',
-  successBorder: 'rgba(16,185,129,0.25)',
-  danger:        '#ef4444',
-  dangerBg:      'rgba(239,68,68,0.08)',
-  dangerBorder:  'rgba(239,68,68,0.25)',
-  warning:       '#f59e0b',
-  warningBg:     'rgba(245,158,11,0.08)',
-  warningBorder: 'rgba(245,158,11,0.25)',
-  info:          '#3b82f6',
-  infoBg:        'rgba(59,130,246,0.08)',
-  infoBorder:    'rgba(59,130,246,0.25)',
-  purple:        '#8b5cf6',
-  purpleBg:      'rgba(139,92,246,0.08)',
-  purpleBorder:  'rgba(139,92,246,0.25)',
-  teal:          '#14b8a6',
-  tealBg:        'rgba(20,184,166,0.08)',
-  tealBorder:    'rgba(20,184,166,0.25)',
-};
+const ThemeCtx = createContext(null);
+const useC = () => useContext(ThemeCtx);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED PRIMITIVES
+// PALETTE FACTORY — returns a full token map for a given mode.
+// Called inside useMemo so it re-runs on every theme toggle.
+// ─────────────────────────────────────────────────────────────────────────────
+function buildPalette(isDark) {
+  // ── Semantic-neutral tokens (same in both modes) ────────────────────────
+  const amber        = '#f59e0b';
+  const amberDark    = '#d97706';
+  const amberBg      = isDark ? 'rgba(245,158,11,0.08)' : 'rgba(217,119,6,0.08)';
+  const amberBorder  = isDark ? 'rgba(245,158,11,0.25)' : 'rgba(217,119,6,0.30)';
+
+  const success      = '#10b981';
+  const successBg    = 'rgba(16,185,129,0.08)';
+  const successBorder= 'rgba(16,185,129,0.25)';
+  const danger       = '#ef4444';
+  const dangerBg     = 'rgba(239,68,68,0.08)';
+  const dangerBorder = 'rgba(239,68,68,0.25)';
+  const warning      = '#f59e0b';
+  const warningBg    = 'rgba(245,158,11,0.08)';
+  const warningBorder= 'rgba(245,158,11,0.25)';
+  const info         = '#3b82f6';
+  const infoBg       = 'rgba(59,130,246,0.08)';
+  const infoBorder   = 'rgba(59,130,246,0.25)';
+  const purple       = '#8b5cf6';
+  const purpleBg     = 'rgba(139,92,246,0.08)';
+  const purpleBorder = 'rgba(139,92,246,0.25)';
+  const teal         = '#14b8a6';
+  const tealBg       = 'rgba(20,184,166,0.08)';
+  const tealBorder   = 'rgba(20,184,166,0.25)';
+
+  // ── Mode-specific surface tokens ────────────────────────────────────────
+  const bgMain        = isDark ? '#09090b'               : '#f4f4f5';          // zinc-950 / zinc-100
+  const bgCard        = isDark ? '#18181b'               : '#ffffff';          // zinc-900 / white
+  const bgElevated    = isDark ? '#1c1c1f'               : '#f9fafb';          // zinc-850 / gray-50
+  const bgDeep        = isDark ? '#09090b'               : '#f1f1f3';          // zinc-950 / zinc-100
+  const bgShaded      = isDark ? 'rgba(255,255,255,0.025)': 'rgba(0,0,0,0.025)';
+  const border        = isDark ? '#3f3f46'               : '#d4d4d8';          // zinc-700 / zinc-300
+  const borderThin    = isDark ? '#27272a'               : '#e4e4e7';          // zinc-800 / zinc-200
+  const textPrimary   = isDark ? '#f4f4f5'               : '#18181b';          // zinc-100 / zinc-900
+  const textSecondary = isDark ? '#a1a1aa'               : '#52525b';          // zinc-400 / zinc-600
+  const textMuted     = isDark ? '#52525b'               : '#a1a1aa';          // zinc-600 / zinc-400
+
+  return {
+    bgMain, bgCard, bgElevated, bgDeep, bgShaded,
+    border, borderThin,
+    textPrimary, textSecondary, textMuted,
+    amber, amberDark, amberBg, amberBorder,
+    success, successBg, successBorder,
+    danger,  dangerBg,  dangerBorder,
+    warning, warningBg, warningBorder,
+    info,    infoBg,    infoBorder,
+    purple,  purpleBg,  purpleBorder,
+    teal,    tealBg,    tealBorder,
+    isDark,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED PRIMITIVES — all read `C` from ThemeCtx
 // ─────────────────────────────────────────────────────────────────────────────
 function SectionTitle({ icon, title, subtitle }) {
+  const C = useC();
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -61,7 +87,9 @@ function SectionTitle({ icon, title, subtitle }) {
   );
 }
 
-function MetricCard({ label, value, sub, icon, color = C.amber, borderColor }) {
+function MetricCard({ label, value, sub, icon, color, borderColor }) {
+  const C = useC();
+  const accentColor = color || C.amber;
   return (
     <div style={{
       background: C.bgCard,
@@ -69,16 +97,16 @@ function MetricCard({ label, value, sub, icon, color = C.amber, borderColor }) {
       borderRadius: 14,
       padding: '22px 24px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      transition: 'border-color 0.2s',
+      transition: 'border-color 0.2s, background 0.2s',
     }}>
       <div>
-        <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 900, color: color, textTransform: 'uppercase', letterSpacing: 2 }}>{label}</p>
-        <p style={{ margin: 0, fontSize: 34, fontWeight: 950, color: color, letterSpacing: '-1px', lineHeight: 1 }}>{value}</p>
+        <p style={{ margin: '0 0 8px', fontSize: 9, fontWeight: 900, color: accentColor, textTransform: 'uppercase', letterSpacing: 2 }}>{label}</p>
+        <p style={{ margin: 0, fontSize: 34, fontWeight: 950, color: accentColor, letterSpacing: '-1px', lineHeight: 1 }}>{value}</p>
         {sub && <p style={{ margin: '6px 0 0', fontSize: 10, color: C.textSecondary, fontWeight: 600 }}>{sub}</p>}
       </div>
       <div style={{
         width: 48, height: 48,
-        background: `rgba(0,0,0,0.3)`,
+        background: C.isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.04)',
         border: `1px solid ${borderColor || C.border}`,
         borderRadius: 12,
         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
@@ -88,11 +116,12 @@ function MetricCard({ label, value, sub, icon, color = C.amber, borderColor }) {
 }
 
 function StatusBadge({ status, isRtl }) {
+  const C = useC();
   const map = {
-    active:             { label_en: 'Active',      label_ar: 'نشط',        color: C.success, bg: C.successBg, border: C.successBorder },
-    trial:              { label_en: 'Trial',        label_ar: 'تجريبي',     color: C.info,    bg: C.infoBg,    border: C.infoBorder    },
-    expired:            { label_en: 'Expired',      label_ar: 'منتهي',      color: C.danger,  bg: C.dangerBg,  border: C.dangerBorder  },
-    pending_onboarding: { label_en: 'Onboarding',   label_ar: 'قيد الإعداد',color: C.warning, bg: C.warningBg, border: C.warningBorder },
+    active:             { label_en: 'Active',    label_ar: 'نشط',        color: C.success, bg: C.successBg, border: C.successBorder },
+    trial:              { label_en: 'Trial',      label_ar: 'تجريبي',     color: C.info,    bg: C.infoBg,    border: C.infoBorder    },
+    expired:            { label_en: 'Expired',    label_ar: 'منتهي',      color: C.danger,  bg: C.dangerBg,  border: C.dangerBorder  },
+    pending_onboarding: { label_en: 'Onboarding', label_ar: 'قيد الإعداد',color: C.warning, bg: C.warningBg, border: C.warningBorder },
   };
   const d = map[status] || { label_en: status || 'Unknown', label_ar: status || 'غير معروف', color: C.textSecondary, bg: C.bgCard, border: C.border };
   return (
@@ -108,12 +137,13 @@ function StatusBadge({ status, isRtl }) {
 }
 
 function ActionBtn({ onClick, disabled, children, variant = 'default', title, small }) {
+  const C = useC();
   const variants = {
-    default: { bg: C.bgCard, color: C.textSecondary, border: C.border },
+    default: { bg: C.bgCard,   color: C.textSecondary, border: C.border },
     green:   { bg: 'linear-gradient(135deg,#059669,#10b981)', color: '#fff', border: 'transparent' },
     red:     { bg: 'linear-gradient(135deg,#dc2626,#ef4444)', color: '#fff', border: 'transparent' },
-    amber:   { bg: C.amberBg, color: C.amber, border: C.amberBorder },
-    blue:    { bg: C.infoBg, color: C.info, border: C.infoBorder },
+    amber:   { bg: C.amberBg,  color: C.amber,  border: C.amberBorder  },
+    blue:    { bg: C.infoBg,   color: C.info,   border: C.infoBorder   },
     slate:   { bg: 'linear-gradient(135deg,#475569,#64748b)', color: '#fff', border: 'transparent' },
     purple:  { bg: C.purpleBg, color: C.purple, border: C.purpleBorder },
   };
@@ -139,13 +169,15 @@ function ActionBtn({ onClick, disabled, children, variant = 'default', title, sm
   );
 }
 
-function Toggle({ checked, onChange, label, desc, color = C.amber }) {
+function Toggle({ checked, onChange, label, desc, color }) {
+  const C = useC();
+  const trackColor = color || C.amber;
   return (
     <div
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 18px',
-        background: checked ? 'rgba(245,158,11,0.04)' : 'transparent',
+        background: checked ? (C.isDark ? 'rgba(245,158,11,0.04)' : 'rgba(217,119,6,0.04)') : 'transparent',
         borderBottom: `1px solid ${C.borderThin}`,
         transition: 'background 0.2s',
         cursor: 'pointer',
@@ -160,8 +192,8 @@ function Toggle({ checked, onChange, label, desc, color = C.amber }) {
       <div
         style={{
           width: 44, height: 24, borderRadius: 12, flexShrink: 0,
-          background: checked ? color : C.bgElevated,
-          border: `1px solid ${checked ? color : C.border}`,
+          background: checked ? trackColor : C.bgElevated,
+          border: `1px solid ${checked ? trackColor : C.border}`,
           position: 'relative',
           transition: 'all 0.25s',
         }}
@@ -180,9 +212,10 @@ function Toggle({ checked, onChange, label, desc, color = C.amber }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM HEALTH BAR (preserved from V1)
+// SYSTEM HEALTH BAR
 // ─────────────────────────────────────────────────────────────────────────────
 function SystemHealthBar({ isRtl }) {
+  const C = useC();
   const [supabaseOk, setSupabaseOk] = useState(null);
   const [supabaseLatency, setSupabaseLatency] = useState(34);
   const [vercelLatency, setVercelLatency] = useState(12);
@@ -232,7 +265,7 @@ function SystemHealthBar({ isRtl }) {
   );
 
   return (
-    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 22px', marginBottom: 20 }}>
+    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 22px', marginBottom: 20, transition: 'background 0.25s, border-color 0.25s' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🖥️</span>
@@ -264,7 +297,7 @@ function SystemHealthBar({ isRtl }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ACTIVITY FEED (preserved from V1, re-styled)
+// ACTIVITY FEED
 // ─────────────────────────────────────────────────────────────────────────────
 function getSeedEvents() {
   return [
@@ -280,12 +313,12 @@ function getSeedEvents() {
 }
 
 function ActivityFeed({ isRtl, users }) {
+  const C = useC();
   const [events, setEvents] = useState(() =>
     getSeedEvents().map(e => ({ ...e, timestamp: new Date(Date.now() + e.ts * 1000) }))
   );
   const [errors, setErrors] = useState([]);
 
-  // Push live event on new user
   useEffect(() => {
     if (!users?.length) return;
     const last = users[users.length - 1];
@@ -296,7 +329,6 @@ function ActivityFeed({ isRtl, users }) {
     });
   }, [users?.length]);
 
-  // Capture uncaught JS errors
   useEffect(() => {
     const onError = (e) => {
       setErrors(prev => [{ id: Date.now(), msg: e.message || String(e), ts: new Date() }, ...prev].slice(0, 10));
@@ -310,14 +342,14 @@ function ActivityFeed({ isRtl, users }) {
   }, []);
 
   const badgeMap = {
-    signup:  { label_en: 'SIGNUP',    label_ar: 'حساب',      color: C.info,    bg: C.infoBg,    border: C.infoBorder    },
-    sub:     { label_en: 'SUBSCRIBE', label_ar: 'اشتراك',    color: C.success, bg: C.successBg, border: C.successBorder },
-    invite:  { label_en: 'INVITE',    label_ar: 'دعوة',      color: C.amber,   bg: C.amberBg,   border: C.amberBorder   },
-    login:   { label_en: 'LOGIN',     label_ar: 'دخول',      color: C.purple,  bg: C.purpleBg,  border: C.purpleBorder  },
-    upgrade: { label_en: 'UPGRADE',   label_ar: 'ترقية',     color: C.success, bg: C.successBg, border: C.successBorder },
-    branch:  { label_en: 'BRANCH',    label_ar: 'فرع',       color: C.teal,    bg: C.tealBg,    border: C.tealBorder    },
-    lock:    { label_en: 'LOCKOUT',   label_ar: 'حظر',       color: C.danger,  bg: C.dangerBg,  border: C.dangerBorder  },
-    auth:    { label_en: 'AUTH',      label_ar: 'مصادقة',    color: C.warning, bg: C.warningBg, border: C.warningBorder },
+    signup:  { label_en: 'SIGNUP',    label_ar: 'حساب',   color: C.info,    bg: C.infoBg,    border: C.infoBorder    },
+    sub:     { label_en: 'SUBSCRIBE', label_ar: 'اشتراك', color: C.success, bg: C.successBg, border: C.successBorder },
+    invite:  { label_en: 'INVITE',    label_ar: 'دعوة',   color: C.amber,   bg: C.amberBg,   border: C.amberBorder   },
+    login:   { label_en: 'LOGIN',     label_ar: 'دخول',   color: C.purple,  bg: C.purpleBg,  border: C.purpleBorder  },
+    upgrade: { label_en: 'UPGRADE',   label_ar: 'ترقية',  color: C.success, bg: C.successBg, border: C.successBorder },
+    branch:  { label_en: 'BRANCH',    label_ar: 'فرع',    color: C.teal,    bg: C.tealBg,    border: C.tealBorder    },
+    lock:    { label_en: 'LOCKOUT',   label_ar: 'حظر',    color: C.danger,  bg: C.dangerBg,  border: C.dangerBorder  },
+    auth:    { label_en: 'AUTH',      label_ar: 'مصادقة', color: C.warning, bg: C.warningBg, border: C.warningBorder },
   };
 
   const fmt = ts => new Date(ts).toLocaleTimeString(isRtl ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -325,7 +357,7 @@ function ActivityFeed({ isRtl, users }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Activity stream */}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', transition: 'background 0.25s, border-color 0.25s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px', borderBottom: `1px solid ${C.border}`, background: C.bgDeep }}>
           <span>📡</span>
           <span style={{ fontSize: 11, fontWeight: 900, color: C.amber, textTransform: 'uppercase', letterSpacing: 1.5 }}>
@@ -358,7 +390,7 @@ function ActivityFeed({ isRtl, users }) {
       </div>
 
       {/* Frontend error capture */}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.dangerBorder}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.dangerBorder}`, borderRadius: 14, overflow: 'hidden', transition: 'background 0.25s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px', borderBottom: `1px solid ${C.dangerBorder}`, background: C.dangerBg }}>
           <span>🐛</span>
           <span style={{ fontSize: 11, fontWeight: 900, color: C.danger, textTransform: 'uppercase', letterSpacing: 1.5 }}>
@@ -389,6 +421,7 @@ function ActivityFeed({ isRtl, users }) {
 // TAB A — TENANT & OWNER HUB
 // ─────────────────────────────────────────────────────────────────────────────
 function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus, setSubscriptionStatus, setSubscriptionExpired, setTrialDaysLeft, storeName, pushNotification }) {
+  const C = useC();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [impersonating, setImpersonating] = useState(() => {
@@ -473,7 +506,6 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
     setTimeout(() => pushNotification?.(isRtl ? `✅ تمت المزامنة (${user.storeName})` : `✅ Synced (${user.storeName})`, 'success'), 1200);
   };
 
-  // Impersonate
   const handleImpersonate = (user) => {
     if (user.id === currentUser?.id) return;
     const snapshot = {
@@ -484,7 +516,6 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
       pos_store_name: localStorage.getItem('pos_store_name'),
     };
     sessionStorage.setItem('_v2_impersonate', JSON.stringify({ snapshot, targetName: user.storeName || user.name }));
-    // Patch localStorage to simulate target owner
     if (user.subscriptionStatus) localStorage.setItem('pos_subscription_status', user.subscriptionStatus);
     if (user.subscriptionExpiry) localStorage.setItem('pos_subscription_end_date', user.subscriptionExpiry);
     if (user.storeName) localStorage.setItem('pos_store_name', user.storeName);
@@ -502,7 +533,6 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
     pushNotification?.(isRtl ? '🔄 تمت استعادة الجلسة الأصلية' : '🔄 Original session restored', 'success');
   };
 
-  // Trial adjuster
   const handleSaveTrialDays = (user) => {
     const days = parseInt(trialInputs[user.id] ?? '', 10);
     if (isNaN(days) || days < 0) return;
@@ -561,17 +591,17 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={isRtl ? 'بحث...' : 'Search owners, stores…'}
-            style={{ width: '100%', background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, padding: '9px 12px 9px 32px', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, padding: '9px 12px 9px 32px', outline: 'none', boxSizing: 'border-box', transition: 'background 0.2s, border-color 0.2s, color 0.2s' }}
           />
         </div>
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-          style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSecondary, fontSize: 11, fontWeight: 700, padding: '9px 12px', outline: 'none', cursor: 'pointer' }}>
+          style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSecondary, fontSize: 11, fontWeight: 700, padding: '9px 12px', outline: 'none', cursor: 'pointer', transition: 'background 0.2s, border-color 0.2s' }}>
           {uniqueRoles.map(r => <option key={r} value={r}>{r === 'ALL' ? (isRtl ? '— كل الأدوار —' : '— All Roles —') : r}</option>)}
         </select>
       </div>
 
       {/* Table */}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 28 }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 28, transition: 'background 0.25s, border-color 0.25s' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
@@ -634,7 +664,7 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
                           value={trialInputs[user.id] ?? ''}
                           onChange={e => setTrialInputs(prev => ({ ...prev, [user.id]: e.target.value }))}
                           placeholder={isRtl ? 'أيام' : 'days'}
-                          style={{ width: 58, background: C.bgDeep, border: `1px solid ${C.border}`, borderRadius: 6, color: C.textPrimary, fontSize: 11, padding: '5px 8px', outline: 'none' }}
+                          style={{ width: 58, background: C.bgDeep, border: `1px solid ${C.border}`, borderRadius: 6, color: C.textPrimary, fontSize: 11, padding: '5px 8px', outline: 'none', transition: 'background 0.2s, border-color 0.2s, color 0.2s' }}
                         />
                         <ActionBtn small onClick={() => handleSaveTrialDays(user)} disabled={!trialInputs[user.id]} variant="amber">✓</ActionBtn>
                       </div>
@@ -667,6 +697,7 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
 // TAB B — SAAS BILLING ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
+  const C = useC();
   const enriched = useMemo(() => users.map(u => ({
     ...u,
     storeName: u.storeName || `${u.name || u.username}'s Store`,
@@ -704,7 +735,7 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
     <div>
       <SectionTitle icon="💰" title={isRtl ? 'محرك الفوترة والاشتراكات' : 'SaaS Billing Engine'} subtitle={isRtl ? 'الإيرادات الشهرية والسنوية وسجل التجديدات' : 'Monthly & annual recurring revenue plus renewal ledger'} />
 
-      {/* MRR / ARR / conversion cards */}
+      {/* MRR / ARR cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
         <MetricCard label={isRtl ? 'الإيراد الشهري المتكرر' : 'Monthly Recurring Revenue'} value={`${mrr.toLocaleString()} ج`} sub={`${activeMonthly} ${isRtl ? 'مشترك نشط × 299 ج' : 'active subs × 299 EGP'}`} icon="📈" color={C.success} borderColor={C.successBorder} />
         <MetricCard label={isRtl ? 'الإيراد السنوي المتوقع' : 'Annual Recurring Revenue'} value={`${arr.toLocaleString()} ج`} sub={isRtl ? 'MRR × 12 شهرًا' : 'MRR × 12 months'} icon="🏦" color={C.amber} borderColor={C.amberBorder} />
@@ -712,13 +743,13 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
         <MetricCard label={isRtl ? 'اشتراكات منتهية' : 'Expired Licenses'} value={expiredCount} sub={isRtl ? 'تحتاج تجديد' : 'Need renewal action'} icon="⏳" color={C.danger} borderColor={C.dangerBorder} />
       </div>
 
-      {/* Plan pricing reference */}
+      {/* Plan pricing tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 28 }}>
         {[
           { tier: isRtl ? 'الخطة الشهرية' : 'Monthly Plan', price: `${PLAN_MONTHLY_EGP} EGP / mo`, icon: '📆', color: C.info },
-          { tier: isRtl ? 'الخطة السنوية' : 'Annual Plan', price: `${PLAN_ANNUAL_EGP} EGP / yr`, icon: '🗓️', color: C.amber, badge: isRtl ? 'توفير 16%' : 'Save 16%' },
+          { tier: isRtl ? 'الخطة السنوية' : 'Annual Plan',  price: `${PLAN_ANNUAL_EGP} EGP / yr`,  icon: '🗓️', color: C.amber, badge: isRtl ? 'توفير 16%' : 'Save 16%' },
         ].map(p => (
-          <div key={p.tier} style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={p.tier} style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14, transition: 'background 0.2s, border-color 0.2s' }}>
             <span style={{ fontSize: 26 }}>{p.icon}</span>
             <div>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: C.textSecondary }}>{p.tier}</p>
@@ -730,7 +761,7 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
       </div>
 
       {/* Renewal Ledger */}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', transition: 'background 0.25s, border-color 0.25s' }}>
         <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`, background: C.bgDeep, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>📋</span>
           <span style={{ fontSize: 11, fontWeight: 900, color: C.amber, textTransform: 'uppercase', letterSpacing: 1.5 }}>
@@ -766,10 +797,7 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
                       {days === null ? (
                         <span style={{ fontSize: 10, color: C.textMuted }}>—</span>
                       ) : (
-                        <span style={{
-                          fontSize: 11, fontWeight: 800,
-                          color: overdue ? C.danger : soon ? C.warning : C.success,
-                        }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: overdue ? C.danger : soon ? C.warning : C.success }}>
                           {overdue ? `${Math.abs(days)}d ${isRtl ? 'متأخر' : 'overdue'}` : `${days}d`}
                         </span>
                       )}
@@ -805,17 +833,18 @@ const DEFAULT_FLAGS = {
 };
 
 const FLAG_META = [
-  { key: 'advanced_analytics',       icon: '📊', label_en: 'Advanced Analytics Dashboard',  label_ar: 'لوحة التحليلات المتقدمة',   desc_en: 'Detailed sales trends, forecasts & KPI charts',    desc_ar: 'رسوم بيانية ومؤشرات أداء متقدمة' },
-  { key: 'barcode_scanner',          icon: '📷', label_en: 'Barcode Scanner Integration',    label_ar: 'تكامل ماسح الباركود',       desc_en: 'POS barcode and QR scan support',                  desc_ar: 'دعم مسح الباركود والرمز السريع QR' },
-  { key: 'mobile_pos_sync',          icon: '📱', label_en: 'Mobile POS Sync',                label_ar: 'مزامنة نقاط البيع المحمول', desc_en: 'Sync transactions from mobile devices in real-time', desc_ar: 'مزامنة العمليات من الأجهزة المحمولة' },
-  { key: 'multi_branch_access',      icon: '🏢', label_en: 'Multi-Branch Access',            label_ar: 'الوصول متعدد الفروع',       desc_en: 'Owner can manage multiple branches from one login', desc_ar: 'إدارة فروع متعددة من تسجيل دخول واحد' },
-  { key: 'custom_receipt_templates', icon: '🧾', label_en: 'Custom Receipt Templates',       label_ar: 'قوالب إيصالات مخصصة',      desc_en: 'Design branded receipts with logo & custom footer', desc_ar: 'تصميم إيصالات مخصصة بشعار وتذييل' },
-  { key: 'ai_sales_insights',        icon: '🤖', label_en: 'AI Sales Insights (Beta)',       label_ar: 'رؤى المبيعات بالذكاء الاصطناعي', desc_en: 'Machine-learning powered sales predictions',   desc_ar: 'توقعات المبيعات بالتعلم الآلي' },
-  { key: 'table_management',         icon: '🍽️', label_en: 'Table Management Module',        label_ar: 'وحدة إدارة الطاولات',       desc_en: 'Dine-in table layout and session tracking',        desc_ar: 'تخطيط الطاولات وتتبع الجلسات' },
-  { key: 'stock_alerts',             icon: '⚠️', label_en: 'Low Stock Alerts',               label_ar: 'تنبيهات المخزون المنخفض',   desc_en: 'Automated alerts when inventory falls below threshold', desc_ar: 'تنبيهات تلقائية عند انخفاض المخزون' },
+  { key: 'advanced_analytics',       icon: '📊', label_en: 'Advanced Analytics Dashboard',  label_ar: 'لوحة التحليلات المتقدمة',        desc_en: 'Detailed sales trends, forecasts & KPI charts',             desc_ar: 'رسوم بيانية ومؤشرات أداء متقدمة'        },
+  { key: 'barcode_scanner',          icon: '📷', label_en: 'Barcode Scanner Integration',    label_ar: 'تكامل ماسح الباركود',             desc_en: 'POS barcode and QR scan support',                          desc_ar: 'دعم مسح الباركود والرمز السريع QR'       },
+  { key: 'mobile_pos_sync',          icon: '📱', label_en: 'Mobile POS Sync',                label_ar: 'مزامنة نقاط البيع المحمول',       desc_en: 'Sync transactions from mobile devices in real-time',       desc_ar: 'مزامنة العمليات من الأجهزة المحمولة'     },
+  { key: 'multi_branch_access',      icon: '🏢', label_en: 'Multi-Branch Access',            label_ar: 'الوصول متعدد الفروع',             desc_en: 'Owner can manage multiple branches from one login',        desc_ar: 'إدارة فروع متعددة من تسجيل دخول واحد'   },
+  { key: 'custom_receipt_templates', icon: '🧾', label_en: 'Custom Receipt Templates',       label_ar: 'قوالب إيصالات مخصصة',             desc_en: 'Design branded receipts with logo & custom footer',        desc_ar: 'تصميم إيصالات مخصصة بشعار وتذييل'       },
+  { key: 'ai_sales_insights',        icon: '🤖', label_en: 'AI Sales Insights (Beta)',       label_ar: 'رؤى المبيعات بالذكاء الاصطناعي', desc_en: 'Machine-learning powered sales predictions',               desc_ar: 'توقعات المبيعات بالتعلم الآلي'           },
+  { key: 'table_management',         icon: '🍽️', label_en: 'Table Management Module',        label_ar: 'وحدة إدارة الطاولات',             desc_en: 'Dine-in table layout and session tracking',                desc_ar: 'تخطيط الطاولات وتتبع الجلسات'           },
+  { key: 'stock_alerts',             icon: '⚠️', label_en: 'Low Stock Alerts',               label_ar: 'تنبيهات المخزون المنخفض',         desc_en: 'Automated alerts when inventory falls below threshold',    desc_ar: 'تنبيهات تلقائية عند انخفاض المخزون'     },
 ];
 
 function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification }) {
+  const C = useC();
   const [selectedTenant, setSelectedTenant] = useState('__global__');
   const [flags, setFlags] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_feature_flags') || 'null') || DEFAULT_FLAGS; }
@@ -833,7 +862,6 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
     if (selectedTenant === '__global__') {
       localStorage.setItem('pos_feature_flags', JSON.stringify(next));
     } else {
-      // Per-tenant flags stored under user record
       const upd = users.map(u => u.id === selectedTenant ? { ...u, featureFlags: { ...(u.featureFlags || DEFAULT_FLAGS), [key]: val } } : u);
       setUsers(upd);
       localStorage.setItem('pos_users', JSON.stringify(upd));
@@ -846,7 +874,6 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
     );
   };
 
-  // Switch displayed flags when tenant changes
   useEffect(() => {
     if (selectedTenant === '__global__') {
       try { setFlags(JSON.parse(localStorage.getItem('pos_feature_flags') || 'null') || DEFAULT_FLAGS); }
@@ -863,16 +890,15 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
     <div>
       <SectionTitle icon="🚩" title={isRtl ? 'التحكم في الميزات والتراخيص' : 'Feature Flags & License Controls'} subtitle={isRtl ? 'تفعيل أو تعطيل الميزات لكل مستأجر بشكل مستقل' : 'Enable or disable features per-tenant independently'} />
 
-      {/* Tenant picker + summary */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 9, fontWeight: 900, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1.5 }}>{isRtl ? 'تطبيق على:' : 'Apply to:'}</label>
           <select value={selectedTenant} onChange={e => setSelectedTenant(e.target.value)}
-            style={{ background: C.bgCard, border: `1px solid ${C.amberBorder}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, fontWeight: 700, padding: '9px 14px', outline: 'none', cursor: 'pointer', minWidth: 220 }}>
+            style={{ background: C.bgCard, border: `1px solid ${C.amberBorder}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, fontWeight: 700, padding: '9px 14px', outline: 'none', cursor: 'pointer', minWidth: 220, transition: 'background 0.2s, color 0.2s' }}>
             {tenantOptions.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
         </div>
-        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', display: 'flex', gap: 18 }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', display: 'flex', gap: 18, transition: 'background 0.2s, border-color 0.2s' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.success }}>{enabledCount}</p>
             <p style={{ margin: 0, fontSize: 9, color: C.textSecondary, fontWeight: 700, textTransform: 'uppercase' }}>{isRtl ? 'مفعّل' : 'Enabled'}</p>
@@ -885,8 +911,7 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
         </div>
       </div>
 
-      {/* Toggle list */}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', transition: 'background 0.25s, border-color 0.25s' }}>
         <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.border}`, background: C.bgDeep, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🎛️</span>
           <span style={{ fontSize: 11, fontWeight: 900, color: C.amber, textTransform: 'uppercase', letterSpacing: 1.5 }}>
@@ -895,7 +920,10 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
         </div>
         {FLAG_META.map((f, i) => (
           <div key={f.key}>
-            <div style={{ display: 'flex', alignItems: 'center', padding: '16px 18px', gap: 14, borderBottom: i < FLAG_META.length - 1 ? `1px solid ${C.borderThin}` : 'none', background: flags[f.key] ? 'rgba(245,158,11,0.03)' : 'transparent', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => handleToggle(f.key, !flags[f.key])}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', padding: '16px 18px', gap: 14, borderBottom: i < FLAG_META.length - 1 ? `1px solid ${C.borderThin}` : 'none', background: flags[f.key] ? (C.isDark ? 'rgba(245,158,11,0.03)' : 'rgba(217,119,6,0.04)') : 'transparent', transition: 'background 0.2s', cursor: 'pointer' }}
+              onClick={() => handleToggle(f.key, !flags[f.key])}
+            >
               <span style={{ fontSize: 22, flexShrink: 0 }}>{f.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{isRtl ? f.label_ar : f.label_en}</p>
@@ -945,6 +973,7 @@ function TabTelemetry({ isRtl, users }) {
 // TAB E — CLOUD MAINTENANCE & BACKUPS
 // ─────────────────────────────────────────────────────────────────────────────
 function TabMaintenance({ isRtl, currentUser, pushNotification }) {
+  const C = useC();
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupDone, setBackupDone]       = useState(false);
   const [maintenanceOn, setMaintenanceOn] = useState(() => localStorage.getItem('pos_maintenance_mode') === 'true');
@@ -1002,7 +1031,7 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
     <div>
       <SectionTitle icon="☁️" title={isRtl ? 'مركز الصيانة والنسخ الاحتياطي' : 'Cloud Maintenance & Backups'} subtitle={isRtl ? 'نسخ احتياطية بنقرة واحدة وضبط وضع الصيانة العالمي' : 'One-click backups and global maintenance mode control'} />
 
-      {/* Maintenance mode alert */}
+      {/* Maintenance active banner */}
       {maintenanceOn && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(245,158,11,0.08))',
@@ -1024,7 +1053,7 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
 
         {/* Backup card */}
-        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '26px 24px' }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '26px 24px', transition: 'background 0.25s, border-color 0.25s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ width: 48, height: 48, background: C.infoBg, border: `1px solid ${C.infoBorder}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>💾</div>
             <div>
@@ -1059,7 +1088,7 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
         </div>
 
         {/* Maintenance mode card */}
-        <div style={{ background: C.bgCard, border: `1px solid ${maintenanceOn ? C.dangerBorder : C.border}`, borderRadius: 14, padding: '26px 24px', transition: 'border-color 0.3s' }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${maintenanceOn ? C.dangerBorder : C.border}`, borderRadius: 14, padding: '26px 24px', transition: 'background 0.25s, border-color 0.3s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <div style={{ width: 48, height: 48, background: maintenanceOn ? C.dangerBg : C.bgElevated, border: `1px solid ${maintenanceOn ? C.dangerBorder : C.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, transition: 'all 0.3s' }}>🔧</div>
             <div>
@@ -1082,7 +1111,7 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
         </div>
 
         {/* Cache purge card */}
-        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '26px 24px' }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '26px 24px', transition: 'background 0.25s, border-color 0.25s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ width: 48, height: 48, background: C.warningBg, border: `1px solid ${C.warningBorder}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🗑️</div>
             <div>
@@ -1118,11 +1147,11 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
 // TAB DEFINITIONS
 // ─────────────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'tenants',     icon: '🏪', label_en: 'Tenant & Owner Hub',        label_ar: 'المستأجرون والملاك'       },
-  { id: 'billing',     icon: '💰', label_en: 'Billing Engine',             label_ar: 'محرك الفوترة'             },
-  { id: 'flags',       icon: '🚩', label_en: 'Feature Flags',              label_ar: 'التحكم في الميزات'         },
-  { id: 'telemetry',   icon: '📡', label_en: 'Live Telemetry',             label_ar: 'رادار المنصة'             },
-  { id: 'maintenance', icon: '☁️', label_en: 'Maintenance & Backups',      label_ar: 'الصيانة والنسخ'           },
+  { id: 'tenants',     icon: '🏪', label_en: 'Tenant & Owner Hub',   label_ar: 'المستأجرون والملاك' },
+  { id: 'billing',     icon: '💰', label_en: 'Billing Engine',        label_ar: 'محرك الفوترة'        },
+  { id: 'flags',       icon: '🚩', label_en: 'Feature Flags',         label_ar: 'التحكم في الميزات'   },
+  { id: 'telemetry',   icon: '📡', label_en: 'Live Telemetry',        label_ar: 'رادار المنصة'        },
+  { id: 'maintenance', icon: '☁️', label_en: 'Maintenance & Backups', label_ar: 'الصيانة والنسخ'      },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1141,7 +1170,12 @@ export default function AdminMasterPanel({
   pushNotification,
   theme = 'dark',
 }) {
-  const isRtl = language === 'ar';
+  const isRtl  = language === 'ar';
+  const isDark = theme !== 'light';
+
+  // ── Build and memoize the palette on every theme change ──────────────────
+  const C = useMemo(() => buildPalette(isDark), [isDark]);
+
   const [activeTab, setActiveTab] = useState('tenants');
   const [tabVisible, setTabVisible] = useState(true);
   const prevTab = useRef('tenants');
@@ -1156,19 +1190,19 @@ export default function AdminMasterPanel({
     }, 160);
   }, [activeTab]);
 
-  const totalUsers  = users.length;
-  const activeSubs  = users.filter(u => (u.subscriptionStatus || 'active') === 'active' || (u.subscriptionStatus) === 'trial').length;
-  const mrr         = users.filter(u => (u.subscriptionStatus || 'active') === 'active').length * PLAN_MONTHLY_EGP;
+  const totalUsers = users.length;
+  const activeSubs = users.filter(u => (u.subscriptionStatus || 'active') === 'active' || u.subscriptionStatus === 'trial').length;
+  const mrr        = users.filter(u => (u.subscriptionStatus || 'active') === 'active').length * PLAN_MONTHLY_EGP;
 
   return (
-    <>
-      {/* Keyframe animations */}
+    // Provide the live palette to every descendant via ThemeCtx
+    <ThemeCtx.Provider value={C}>
       <style>{`
-        @keyframes v2pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes v2spin  { to{transform:rotate(360deg)} }
+        @keyframes v2pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes v2spin   { to{transform:rotate(360deg)} }
         @keyframes v2fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
         .v2tab-btn { transition: all 0.18s ease; }
-        .v2tab-btn:hover { background: rgba(245,158,11,0.08) !important; color: #f59e0b !important; }
+        .v2tab-btn:hover { background: ${isDark ? 'rgba(245,158,11,0.08)' : 'rgba(217,119,6,0.08)'} !important; color: ${isDark ? '#f59e0b' : '#d97706'} !important; }
       `}</style>
 
       <div style={{
@@ -1177,11 +1211,13 @@ export default function AdminMasterPanel({
         fontFamily: isRtl ? "'Cairo','Segoe UI',sans-serif" : "'Inter','Segoe UI',sans-serif",
         color: C.textPrimary,
         display: 'flex', flexDirection: 'column',
+        transition: 'background 0.25s, color 0.25s',
       }} dir={isRtl ? 'rtl' : 'ltr'}>
 
-        {/* ── Page Header ───────────────────────────────────────── */}
-        <div style={{ padding: '28px 28px 0', borderBottom: `1px solid ${C.borderThin}`, background: C.bgCard }}>
+        {/* ── Page Header ─────────────────────────────────────── */}
+        <div style={{ padding: '28px 28px 0', borderBottom: `1px solid ${C.borderThin}`, background: C.bgCard, transition: 'background 0.25s, border-color 0.25s' }}>
           <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+
             {/* Badge + title row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
               <div>
@@ -1189,10 +1225,10 @@ export default function AdminMasterPanel({
                   <span style={{ fontSize: 12 }}>🛡️</span>
                   <span style={{ fontSize: 9, fontWeight: 900, color: C.amber, textTransform: 'uppercase', letterSpacing: 2 }}>SaaS Provider Command Center — v2.0</span>
                 </div>
-                <h1 style={{ margin: 0, fontSize: 26, fontWeight: 950, color: C.textPrimary, letterSpacing: 0.3 }}>
+                <h1 style={{ margin: 0, fontSize: 26, fontWeight: 950, color: C.textPrimary, letterSpacing: 0.3, transition: 'color 0.25s' }}>
                   {isRtl ? 'لوحة المسؤول الرئيسية — V2' : 'Master Admin Panel — V2'}
                 </h1>
-                <p style={{ margin: '6px 0 0', fontSize: 12, color: C.textSecondary, fontWeight: 500 }}>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: C.textSecondary, fontWeight: 500, transition: 'color 0.25s' }}>
                   {isRtl ? 'مركز تحكم شامل للمنصة: المستأجرون، الفوترة، الميزات، المراقبة، الصيانة.' : 'Full-spectrum platform control: tenants, billing, features, telemetry & maintenance.'}
                 </p>
               </div>
@@ -1200,11 +1236,11 @@ export default function AdminMasterPanel({
               {/* Quick metrics */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {[
-                  { label: isRtl ? 'محطات' : 'Workstations', value: totalUsers,   color: C.textSecondary },
-                  { label: isRtl ? 'نشطون'  : 'Active',       value: activeSubs,  color: C.success       },
-                  { label: isRtl ? 'MRR'    : 'MRR',          value: `${mrr}ج`,   color: C.amber         },
+                  { label: isRtl ? 'محطات' : 'Workstations', value: totalUsers,  color: C.textSecondary },
+                  { label: isRtl ? 'نشطون'  : 'Active',       value: activeSubs, color: C.success       },
+                  { label: isRtl ? 'MRR'    : 'MRR',          value: `${mrr}ج`,  color: C.amber         },
                 ].map(m => (
-                  <div key={m.label} style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 72 }}>
+                  <div key={m.label} style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 72, transition: 'background 0.2s, border-color 0.2s' }}>
                     <p style={{ margin: 0, fontSize: 20, fontWeight: 950, color: m.color }}>{m.value}</p>
                     <p style={{ margin: '2px 0 0', fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{m.label}</p>
                   </div>
@@ -1233,6 +1269,7 @@ export default function AdminMasterPanel({
                       whiteSpace: 'nowrap',
                       borderRadius: '8px 8px 0 0',
                       flexShrink: 0,
+                      transition: 'color 0.18s, background 0.18s, border-color 0.18s',
                     }}
                   >
                     <span>{tab.icon}</span>
@@ -1244,7 +1281,7 @@ export default function AdminMasterPanel({
           </div>
         </div>
 
-        {/* ── Tab Content ────────────────────────────────────────── */}
+        {/* ── Tab Content ─────────────────────────────────────── */}
         <div style={{
           flex: 1,
           padding: '28px',
@@ -1300,6 +1337,6 @@ export default function AdminMasterPanel({
           )}
         </div>
       </div>
-    </>
+    </ThemeCtx.Provider>
   );
 }
