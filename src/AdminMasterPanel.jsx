@@ -563,8 +563,8 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
           border: `1px solid ${C.amberBorder}`,
           borderRadius: 12, padding: '14px 20px',
           marginBottom: 20,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        }}>
+          gap: 12,
+        }} className="flex flex-col md:flex-row items-start md:items-center justify-between">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>👁️</span>
             <div>
@@ -585,8 +585,8 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
       <SectionTitle icon="🏪" title={isRtl ? 'مركز المستأجرين والملاك' : 'Tenant & Owner Hub'} subtitle={isRtl ? 'إدارة حسابات الملاك والفروع وتعديل الاشتراكات' : 'Manage owner accounts, branches, and subscription controls'} />
 
       {/* Search / filter bar */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full">
+        <div style={{ position: 'relative' }} className="w-full sm:flex-1">
           <span style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 10, fontSize: 12, color: C.textMuted, pointerEvents: 'none' }}>🔍</span>
           <input
             value={search} onChange={e => setSearch(e.target.value)}
@@ -595,6 +595,7 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
           />
         </div>
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
+          className="w-full sm:w-auto"
           style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSecondary, fontSize: 11, fontWeight: 700, padding: '9px 12px', outline: 'none', cursor: 'pointer', transition: 'background 0.2s, border-color 0.2s' }}>
           {uniqueRoles.map(r => <option key={r} value={r}>{r === 'ALL' ? (isRtl ? '— كل الأدوار —' : '— All Roles —') : r}</option>)}
         </select>
@@ -602,8 +603,8 @@ function TabTenantHub({ isRtl, users, setUsers, currentUser, subscriptionStatus,
 
       {/* Table */}
       <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 28, transition: 'background 0.25s, border-color 0.25s' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
+        <div className="w-full overflow-x-auto border border-zinc-800 rounded-lg">
+          <table className="w-full min-w-[700px]" style={{ borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
               <tr style={{ background: C.bgDeep, borderBottom: `1px solid ${C.border}` }}>
                 {[
@@ -736,7 +737,7 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
       <SectionTitle icon="💰" title={isRtl ? 'محرك الفوترة والاشتراكات' : 'SaaS Billing Engine'} subtitle={isRtl ? 'الإيرادات الشهرية والسنوية وسجل التجديدات' : 'Monthly & annual recurring revenue plus renewal ledger'} />
 
       {/* MRR / ARR cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
         <MetricCard label={isRtl ? 'الإيراد الشهري المتكرر' : 'Monthly Recurring Revenue'} value={`${mrr.toLocaleString()} ج`} sub={`${activeMonthly} ${isRtl ? 'مشترك نشط × 299 ج' : 'active subs × 299 EGP'}`} icon="📈" color={C.success} borderColor={C.successBorder} />
         <MetricCard label={isRtl ? 'الإيراد السنوي المتوقع' : 'Annual Recurring Revenue'} value={`${arr.toLocaleString()} ج`} sub={isRtl ? 'MRR × 12 شهرًا' : 'MRR × 12 months'} icon="🏦" color={C.amber} borderColor={C.amberBorder} />
         <MetricCard label={isRtl ? 'مشتركون نشطون' : 'Active Subscribers'} value={activeMonthly} sub={isRtl ? `${trialCount} تجريبي` : `${trialCount} on trial`} icon="⚡" color={C.info} borderColor={C.infoBorder} />
@@ -744,7 +745,7 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
       </div>
 
       {/* Plan pricing tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 28 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-[14px] mb-[28px]">
         {[
           { tier: isRtl ? 'الخطة الشهرية' : 'Monthly Plan', price: `${PLAN_MONTHLY_EGP} EGP / mo`, icon: '📆', color: C.info },
           { tier: isRtl ? 'الخطة السنوية' : 'Annual Plan',  price: `${PLAN_ANNUAL_EGP} EGP / yr`,  icon: '🗓️', color: C.amber, badge: isRtl ? 'توفير 16%' : 'Save 16%' },
@@ -768,8 +769,8 @@ function TabBilling({ isRtl, users, setUsers, currentUser, pushNotification }) {
             {isRtl ? 'سجل التجديدات القادمة' : 'Renewal Ledger'}
           </span>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
+        <div className="w-full overflow-x-auto border border-zinc-800 rounded-lg">
+          <table className="w-full min-w-[700px]" style={{ borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
             <thead>
               <tr style={{ background: C.bgDeep, borderBottom: `1px solid ${C.border}` }}>
                 {[
@@ -890,11 +891,12 @@ function TabFeatureFlags({ isRtl, users, setUsers, currentUser, pushNotification
     <div>
       <SectionTitle icon="🚩" title={isRtl ? 'التحكم في الميزات والتراخيص' : 'Feature Flags & License Controls'} subtitle={isRtl ? 'تفعيل أو تعطيل الميزات لكل مستأجر بشكل مستقل' : 'Enable or disable features per-tenant independently'} />
 
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="flex flex-col md:flex-row gap-[14px] items-start md:items-center mb-[20px]">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} className="w-full md:w-auto">
           <label style={{ fontSize: 9, fontWeight: 900, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1.5 }}>{isRtl ? 'تطبيق على:' : 'Apply to:'}</label>
           <select value={selectedTenant} onChange={e => setSelectedTenant(e.target.value)}
-            style={{ background: C.bgCard, border: `1px solid ${C.amberBorder}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, fontWeight: 700, padding: '9px 14px', outline: 'none', cursor: 'pointer', minWidth: 220, transition: 'background 0.2s, color 0.2s' }}>
+            className="w-full md:w-auto md:min-w-[220px]"
+            style={{ background: C.bgCard, border: `1px solid ${C.amberBorder}`, borderRadius: 8, color: C.textPrimary, fontSize: 12, fontWeight: 700, padding: '9px 14px', outline: 'none', cursor: 'pointer', transition: 'background 0.2s, color 0.2s' }}>
             {tenantOptions.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
         </div>
@@ -1050,7 +1052,7 @@ function TabMaintenance({ isRtl, currentUser, pushNotification }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 
         {/* Backup card */}
         <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: '26px 24px', transition: 'background 0.25s, border-color 0.25s' }}>
@@ -1234,13 +1236,13 @@ export default function AdminMasterPanel({
               </div>
 
               {/* Quick metrics */}
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div className="grid grid-cols-3 gap-3 w-full md:w-auto md:flex md:gap-3">
                 {[
                   { label: isRtl ? 'محطات' : 'Workstations', value: totalUsers,  color: C.textSecondary },
                   { label: isRtl ? 'نشطون'  : 'Active',       value: activeSubs, color: C.success       },
                   { label: isRtl ? 'MRR'    : 'MRR',          value: `${mrr}ج`,  color: C.amber         },
                 ].map(m => (
-                  <div key={m.label} style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 72, transition: 'background 0.2s, border-color 0.2s' }}>
+                  <div key={m.label} style={{ background: C.bgElevated, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px', textAlign: 'center', transition: 'background 0.2s, border-color 0.2s' }}>
                     <p style={{ margin: 0, fontSize: 20, fontWeight: 950, color: m.color }}>{m.value}</p>
                     <p style={{ margin: '2px 0 0', fontSize: 9, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{m.label}</p>
                   </div>
